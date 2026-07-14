@@ -7,9 +7,13 @@ and systemd keeps the node and its staking heartbeat alive across reboots.
 
 ## Setup
 
-1. **Flash** Raspberry Pi OS Lite (64-bit) with headless config (hostname
-   `testate`, ssh enabled, wifi via `custom.toml`) — see repo history or use
-   Raspberry Pi Imager's customization.
+1. **Flash** Raspberry Pi OS Lite (64-bit) with headless config. GOTCHA:
+   the Trixie-based images (Debian 13, 2025+) **ignore `custom.toml`** —
+   only the `ssh` marker file and `userconf.txt` still work from the boot
+   partition. Plan on password SSH for first contact (Ethernet if WiFi
+   isn't configured), then set hostname/WiFi/keys over SSH:
+   `hostnamectl set-hostname testate`, `raspi-config nonint do_wifi_country
+   US`, `nmcli dev wifi connect <ssid> password <pass>`.
 2. **Buzzer** (optional): passive buzzer between **3V3 (pin 1)** and
    **GPIO4 (pin 7)** — same GPIO number as the ESP32 wiring, on purpose.
    Config `"buzzer": {"pin": 4, "common": "3v3"}` (`"common": "off"` to
