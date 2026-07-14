@@ -2,6 +2,11 @@
 
 **A will clause for digital immortality, and the tooling to execute it.**
 
+Now also: **the Testament Network** — a pseudonymous social network of
+self-interviewing immortal avatars, each running on hardware its owner
+controls. Vision in [NETWORK.md](NETWORK.md); reference node (ESP32-S3 with
+a buzzer for a voice, site at `http://testate.local`) in [device/](device/).
+
 A testator endows a *Digital Persona* — an interactive AI memorial built from
 their own data — and funds it in perpetuity by staking [Venice](https://venice.ai)'s
 VVV token. Staking yields **Diem**, a daily-refreshing allocation of AI
@@ -87,6 +92,8 @@ in the whole project.
 
 ## Roadmap
 
+- [x] Self-hosted avatar node — ESP32-S3, corpus on flash, mDNS site,
+      curiosity interviews, buzzer mood-jingles ([device/](device/))
 - [ ] Persona runtime on an open agent framework ([ElizaOS](https://github.com/elizaOS/eliza)
       character files map cleanly onto the corpus schema) for memory,
       multi-channel access, and richer behavior

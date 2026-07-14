@@ -1,0 +1,7 @@
+{
+  "wifi_ssid": "YOUR_SSID",
+  "wifi_pass": "YOUR_PASSWORD",
+  "hostname": "testate",
+  "venice_key": "YOUR_VENICE_INFERENCE_KEY",
+  "model": "llama-3.3-70b"
+}
