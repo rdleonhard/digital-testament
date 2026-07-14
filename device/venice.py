@@ -16,11 +16,12 @@ def complete(cfg, messages, max_tokens=350):
             "Authorization": "Bearer " + cfg["venice_key"],
             "Content-Type": "application/json",
         },
+        # encode: Content-Length must count UTF-8 bytes, not chars
         data=json.dumps({
             "model": cfg.get("model", "llama-3.3-70b"),
             "messages": messages,
             "max_tokens": max_tokens,
-        }),
+        }).encode(),
     )
     try:
         if r.status_code != 200:
