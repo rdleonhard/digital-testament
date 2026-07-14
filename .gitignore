@@ -1,7 +1,11 @@
 # Bearer assets -- never commit
 estate_keys.json
+.env
 *.seed
 *.key
+
+# Personal corpora stay off the public repo
+*.local.json
 
 __pycache__/
 *.pyc
