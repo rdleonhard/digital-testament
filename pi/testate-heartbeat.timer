@@ -1,0 +1,10 @@
+[Unit]
+Description=Venice stake heartbeat twice weekly (active-staker window is 7 days)
+
+[Timer]
+OnCalendar=Mon,Thu 09:00
+Persistent=true
+RandomizedDelaySec=1h
+
+[Install]
+WantedBy=timers.target

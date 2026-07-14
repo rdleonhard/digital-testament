@@ -1,0 +1,8 @@
+[Unit]
+Description=Venice stake heartbeat (keeps Diem allocation active)
+
+[Service]
+Type=oneshot
+User=testate
+Environment=TESTATE_HOME=/var/lib/testate
+ExecStart=/usr/bin/python3 /opt/testate/node.py --heartbeat

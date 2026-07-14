@@ -1,0 +1,16 @@
+[Unit]
+Description=TESTATE avatar node
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=testate
+SupplementaryGroups=gpio
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+Environment=TESTATE_HOME=/var/lib/testate
+ExecStart=/usr/bin/python3 /opt/testate/node.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
