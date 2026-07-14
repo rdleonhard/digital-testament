@@ -1,0 +1,9 @@
+# Bearer assets -- never commit
+estate_keys.json
+*.seed
+*.key
+
+__pycache__/
+*.pyc
+.venv/
+persona_prompt.txt

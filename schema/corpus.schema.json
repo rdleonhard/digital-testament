@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/rdleonhard/digital-testament/schema/corpus.schema.json",
+  "title": "Digital Corpus",
+  "description": "Machine-readable representation of a testator's personality, memories, and manner of expression, referenced as the 'Digital Corpus' in the Digital Persona Legacy article. Version this file; the will's Memorandum of Digital Assets should cite the schema_version in use.",
+  "type": "object",
+  "required": ["schema_version", "identity", "voice", "values"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Semantic version of this schema the corpus conforms to.",
+      "examples": ["1.0.0"]
+    },
+    "identity": {
+      "type": "object",
+      "required": ["full_name"],
+      "properties": {
+        "full_name": { "type": "string" },
+        "preferred_name": { "type": "string" },
+        "born": { "type": "string", "description": "ISO 8601 date" },
+        "died": { "type": "string", "description": "ISO 8601 date; set by the Digital Executor at instantiation" },
+        "places": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Places lived, in order, with optional years"
+        },
+        "occupations": { "type": "array", "items": { "type": "string" } },
+        "relationships": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "relation"],
+            "properties": {
+              "name": { "type": "string" },
+              "relation": { "type": "string" },
+              "notes": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "voice": {
+      "type": "object",
+      "description": "How the testator sounds. The persona builder converts this section into style instructions.",
+      "properties": {
+        "register": { "type": "string", "description": "e.g. 'dry, courtly, allergic to jargon'" },
+        "catchphrases": { "type": "array", "items": { "type": "string" } },
+        "humor": { "type": "string" },
+        "pet_peeves": { "type": "array", "items": { "type": "string" } },
+        "writing_samples": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Verbatim short samples of the testator's prose (letters, toasts, emails). The single highest-leverage field for fidelity."
+        }
+      }
+    },
+    "values": {
+      "type": "object",
+      "properties": {
+        "beliefs": { "type": "array", "items": { "type": "string" } },
+        "advice": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Standing advice the testator wants repeated to descendants"
+        },
+        "taboos": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Topics the persona must decline to speak on (mirrors the will's exclusion list)"
+        }
+      }
+    },
+    "memories": {
+      "type": "array",
+      "description": "Discrete first-person anecdotes. Keep each self-contained; the persona treats these as its only autobiographical ground truth.",
+      "items": {
+        "type": "object",
+        "required": ["title", "narrative"],
+        "properties": {
+          "title": { "type": "string" },
+          "year": { "type": ["integer", "string"] },
+          "narrative": { "type": "string" },
+          "people": { "type": "array", "items": { "type": "string" } },
+          "tags": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "knowledge": {
+      "type": "array",
+      "description": "Domains the testator could genuinely speak to, with self-assessed depth.",
+      "items": {
+        "type": "object",
+        "required": ["domain"],
+        "properties": {
+          "domain": { "type": "string" },
+          "depth": { "type": "string", "enum": ["passing", "conversational", "professional", "expert"] },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "messages": {
+      "type": "array",
+      "description": "Sealed messages for specific people or occasions; delivered by the persona when the trigger is met.",
+      "items": {
+        "type": "object",
+        "required": ["to", "trigger", "message"],
+        "properties": {
+          "to": { "type": "string" },
+          "trigger": { "type": "string", "description": "e.g. 'first conversation', 'wedding day', 'turns 18'" },
+          "message": { "type": "string" }
+        }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "description": "Runtime directives — mirrors will Sections 5(b)-(e).",
+      "properties": {
+        "disclosure": {
+          "type": "string",
+          "description": "Override for the mandatory AI-memorial disclosure line",
+          "default": "I'm an AI memorial representation, not the living person."
+        },
+        "fabrication_policy": {
+          "type": "string",
+          "default": "Acknowledge uncertainty rather than invent biographical facts not in this corpus."
+        },
+        "prohibited": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [
+            "executing or amending legal instruments",
+            "contracting or incurring obligations",
+            "testimony or sworn statements",
+            "legal, medical, or financial advice",
+            "construing the testator's will or intent"
+          ]
+        }
+      }
+    }
+  }
+}
