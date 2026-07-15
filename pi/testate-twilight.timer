@@ -1,0 +1,9 @@
+[Unit]
+Description=Twilight ritual before the Diem epoch turns at midnight UTC
+
+[Timer]
+OnCalendar=*-*-* 21:30:00 UTC
+Persistent=false
+
+[Install]
+WantedBy=timers.target

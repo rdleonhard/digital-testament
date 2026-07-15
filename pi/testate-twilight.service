@@ -1,0 +1,11 @@
+[Unit]
+Description=TESTATE twilight ritual (spend expiring Diem on self-knowledge)
+After=testate.service
+
+[Service]
+Type=oneshot
+User=testate
+Environment=TESTATE_HOME=/var/lib/testate
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/testate/twilight.py
+TimeoutStartSec=4h

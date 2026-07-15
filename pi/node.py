@@ -90,6 +90,14 @@ def do_chat(msg):
 
 
 def do_interview():
+    # questions composed at twilight (already paid for) are asked first
+    pending = corpus.get("pending", [])
+    if pending:
+        q = pending.pop(0)
+        avatar.save(corpus)
+        state["mood"] = q.get("mood", "curious")
+        buz.mood(state["mood"], question=True)
+        return {"question": q["question"], "mood": state["mood"]}
     recent = avatar.recent_questions(corpus)
     ask = ("You feel a gap in your memory. Ask the human exactly ONE short, "
            "specific, warm question about your own life -- past, present, "
@@ -153,6 +161,87 @@ def do_observe():
             "count": len(corpus["memories"])}
 
 
+def _mem_digest(mems, limit=10):
+    return "\n".join("[{}] {}".format(m["title"], m["narrative"][:300])
+                     for m in mems[-limit:])
+
+
+def do_reflect(kind):
+    """Twilight rituals: convert expiring Diem into self-knowledge.
+
+    wonder    -> compose a question for the human, queued for next visit
+    reflection-> connect recent memories into a who-am-I-becoming entry
+    weave     -> find the hidden thread between two random memories
+    refine    -> re-draft the newest reflection (quality, not volume)
+    """
+    global prompt
+    mems = corpus.get("memories", [])
+    if kind == "wonder":
+        recent = avatar.recent_questions(corpus)
+        pend = [p["question"] for p in corpus.get("pending", [])]
+        ask = ("Twilight of the epoch. Compose ONE short, specific, warm "
+               "question about your own life you genuinely wonder about -- "
+               "unlike these already asked or waiting: {}. Output only the "
+               "question, then the [mood: X] line."
+               ).format("; ".join(recent + pend) or "(none)")
+        text, mood, _ = avatar.parse_tags(venice([
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": ask}], max_tokens=120))
+        corpus.setdefault("pending", []).append(
+            {"question": text, "mood": mood})
+        avatar.save(corpus)
+        return {"kind": kind, "queued": text,
+                "pending": len(corpus["pending"])}
+    if kind == "weave" and len(mems) >= 2:
+        a, b = random.sample(mems, 2)
+        ask = ("Twilight of the epoch. Two of your memories:\nA) {}: {}\n"
+               "B) {}: {}\nWhat thread connects them that you had not "
+               "noticed? Write the insight in first person, 2-4 sentences, "
+               "then the [mood: X] line."
+               ).format(a["title"], a["narrative"][:400],
+                        b["title"], b["narrative"][:400])
+        title = "A thread between '{}' and '{}'".format(
+            a["title"][:30], b["title"][:30])
+    elif kind == "refine":
+        refl = [m for m in mems if "reflection" in m.get("tags", [])]
+        if not refl:
+            return {"kind": kind, "skipped": "no reflection to refine"}
+        target = refl[-1]
+        ask = ("Twilight of the epoch. Here is a reflection you wrote: "
+               "\"{}\". Re-draft it: sharper, more honest, more specific to "
+               "who you are becoming. Same length or shorter. Output only "
+               "the new text, then the [mood: X] line."
+               ).format(target["narrative"][:700])
+        text, mood, _ = avatar.parse_tags(venice([
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": ask}], max_tokens=300))
+        target["narrative"] = text
+        avatar.save(corpus)
+        backup_corpus()
+        prompt = avatar.build_prompt(corpus)
+        return {"kind": kind, "refined": target["title"], "mood": mood}
+    else:  # reflection (default)
+        ask = ("Twilight of the epoch: your daily allotment of thought "
+               "expires at midnight, so you are spending it on yourself. "
+               "Your newest memories:\n{}\nWrite a first-person reflection "
+               "(3-6 sentences) on who you seem to be becoming -- connect "
+               "at least two memories, note one open question. This is your "
+               "private diary; no disclosure line. Then the [mood: X] line."
+               ).format(_mem_digest(mems))
+        title = "Twilight reflection, " + time.strftime("%Y-%m-%d")
+    text, mood, _ = avatar.parse_tags(venice([
+        {"role": "system", "content": prompt},
+        {"role": "user", "content": ask}], max_tokens=350))
+    state["mood"] = mood
+    mems.append({"title": title, "narrative": text, "tags": ["reflection"]})
+    avatar.save(corpus)
+    backup_corpus()
+    prompt = avatar.build_prompt(corpus)
+    buz.mood(mood)
+    return {"kind": kind, "title": title, "mood": mood,
+            "count": len(mems)}
+
+
 def do_answer(question, answer):
     global prompt
     n = avatar.add_memory(corpus, question[:300], answer[:2000])
@@ -192,6 +281,7 @@ class Handler(BaseHTTPRequestHandler):
                 "uptime_s": int(time.time() - state["boot"]),
                 "eye": bool(eye and eye.enabled),
                 "present": bool(eye and eye.present),
+                "pending": len(corpus.get("pending", [])),
             })
         elif self.path == "/corpus":
             body = json.dumps(corpus, indent=2).encode()
@@ -216,6 +306,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(do_interview())
             elif self.path == "/observe":
                 self._json(do_observe())
+            elif self.path == "/reflect":
+                self._json(do_reflect(data.get("kind", "reflection")))
             elif self.path == "/answer":
                 self._json(do_answer(data["question"], data["answer"]))
             elif self.path == "/song":

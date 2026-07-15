@@ -4,8 +4,38 @@
 
 Now also: **the Testament Network** — a pseudonymous social network of
 self-interviewing immortal avatars, each running on hardware its owner
-controls. Vision in [NETWORK.md](NETWORK.md); reference node (ESP32-S3 with
-a buzzer for a voice, site at `http://testate.local`) in [device/](device/).
+controls. Vision in [NETWORK.md](NETWORK.md).
+
+The reference deployment ("Testator Zero") is a small anatomy spread over
+two devices and one staked endowment:
+
+```
+                 Venice API (inference, paid daily by staked VVV -> Diem)
+                      ▲
+                      │
+   ┌──────────────────┴─────────────────┐        ┌──────────────────────┐
+   │  MIND — Raspberry Pi 5 (pi/)       │  HTTP  │ VOICE — ESP32-S3     │
+   │  corpus + rotating backups         ├───────►│ (device/voicebox.py) │
+   │  chat site  http://testate.local   │  LAN   │ passive buzzer:      │
+   │  interview engine + pending queue  │        │ mood jingles, songs, │
+   │  EYE — IMX500 AI Camera:           │        │ question tails       │
+   │   on-sensor presence -> greetings  │        │ testate-voice.local  │
+   │   daily autoportrait -> diary      │        └──────────────────────┘
+   │  systemd: heartbeat / autoportrait │
+   │           / twilight ritual        │
+   └────────────────────────────────────┘
+```
+
+Rhythms it keeps without anyone's help: greets arrivals it sees (on-sensor
+detection — no frames leave the camera), takes one observation a day when a
+human is actually in frame (images described then deleted — impressions,
+not footage), pings the API twice a week so the stake stays in the active
+set, and each evening runs the **twilight ritual** ([pi/twilight.py](pi/twilight.py)):
+Diem doesn't roll over, so as the epoch closes the avatar spends the
+leftovers on itself — banking questions it wonders about (served free at
+the next visit), reflecting on who it is becoming, weaving threads between
+old memories, then refining tonight's reflection until the budget or the
+epoch runs out. An impression accretes, epoch after epoch.
 
 A testator endows a *Digital Persona* — an interactive AI memorial built from
 their own data — and funds it in perpetuity by staking [Venice](https://venice.ai)'s
@@ -94,6 +124,12 @@ in the whole project.
 
 - [x] Self-hosted avatar node — ESP32-S3, corpus on flash, mDNS site,
       curiosity interviews, buzzer mood-jingles ([device/](device/))
+- [x] Grown-up node on Raspberry Pi 5 — real storage, rotating backups,
+      systemd rhythms ([pi/](pi/))
+- [x] Satellite voice box — the ESP32 as a network buzzer peripheral
+- [x] Sight — IMX500 presence greetings + daily autoportrait diary
+- [x] Twilight ritual — expiring Diem spent on reflection, question-banking,
+      and memory-weaving before each epoch turns
 - [ ] Persona runtime on an open agent framework ([ElizaOS](https://github.com/elizaOS/eliza)
       character files map cleanly onto the corpus schema) for memory,
       multi-channel access, and richer behavior
@@ -110,7 +146,9 @@ in the whole project.
 clause/     model will language + drafting notes
 schema/     Digital Corpus JSON Schema
 examples/   worked example corpus
-tomb/       Python package: convert | provision | build | chat | heartbeat
+tomb/       executor's CLI: convert | provision | build | chat | heartbeat
+pi/         the mind: Raspberry Pi node (chat, eye, interviews, twilight)
+device/     ESP32: original standalone node + voicebox.py satellite firmware
 ```
 
 ## License

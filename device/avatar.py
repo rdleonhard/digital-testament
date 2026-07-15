@@ -39,7 +39,7 @@ def recent_questions(corpus, n=12):
             if "interview" in m.get("tags", [])][-n:]
 
 
-GROWN_TAGS = ("interview", "observation")
+GROWN_TAGS = ("interview", "observation", "reflection")
 
 
 def _memories_block(corpus):
