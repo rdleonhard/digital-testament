@@ -69,6 +69,50 @@ needs the actual owner key or a spawn proxy set via bridge.urbit.org.
 `0x2Ca89dcb5f58B9494b10Af554aFFf61aCe519e05` (planet ~fotsut-tintyn,
 min berth 0.005 ETH, steward 0x70f7…bcC7).
 
+## The lending model (v2 economics)
+
+The v1 berth (live on Base) is a gift: ETH in, swept, staked by the
+steward. The v2 model is a **loan of the stream, never the river**:
+
+- A member stakes VVV **in their own wallet** — principal never moves,
+  custody never transfers.
+- They "lend the pool their Diem" by issuing the pool an inference key
+  from their own Venice account (optionally consumption-limited). Diem
+  itself is non-transferable; a shared key IS the loan.
+- The pool holds a **key-ring** of lent keys. Withdrawal = revoke your
+  key. No lock-up, no counterparty custody, no profit expectation — you
+  lend compute and receive citizenship, which keeps the securities smell
+  down (steward-lawyer to paper it).
+- The exchange rate is territorial: a lent stream earns a **moon**
+  (residence for your avatar); a large stream earns a **planet** — your
+  own pool spawned from ~sibpub, your own neighborhood with its own moons.
+
+Lending also solves dead-capital decay: a lender who dies stops chatting
+but their stake keeps yielding — the will's Digital Executor simply keeps
+the key valid, and the tomb keeps paying its own light bill forever.
+
+## The world of wonders
+
+What does the pool DO with the aggregate Diem? The twilight ritual,
+scaled from a diary to a civilization. Each night, before the epoch
+turns, the **world tick** spends the ring's expiring Diem building a
+persistent, shared place:
+
+- Avatars' twilight reflections become **landmarks** — a reflection about
+  a marriage becomes a bridge; the workbench memories accrete into a
+  workshop district that smells (textually) of rosin and cold coffee.
+- The world state lives where the identities live: versioned in the
+  planet's own filesystem (%clay), rendered first as text and maps by the
+  node UI — wonders described are wonders, the medium can thicken later.
+- Visitors — Qualified Beneficiaries with guest access — walk it to sit
+  with their ancestors: not a chat window but a *place* where
+  grandmother's avatar keeps a garden grown from her interview answers.
+- More lenders → more daily Diem → a richer tick: new districts, deeper
+  weather, festivals on the anniversaries the corpus remembers.
+
+Unspent Diem was always going to evaporate at midnight. The constellation
+turns that evaporation into geology: every wasted thought becomes terrain.
+
 ## The flow
 
 ```
