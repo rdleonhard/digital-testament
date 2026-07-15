@@ -69,10 +69,35 @@ needs the actual owner key or a spawn proxy set via bridge.urbit.org.
 `0x2Ca89dcb5f58B9494b10Af554aFFf61aCe519e05` (planet ~fotsut-tintyn,
 min berth 0.005 ETH, steward 0x70f7…bcC7).
 
-## The lending model (v2 economics)
+## The product (v3 economics — normie-first)
 
-The v1 berth (live on Base) is a gift: ETH in, swept, staked by the
-steward. The v2 model is a **loan of the stream, never the river**:
+The target buyer struggles with PDFs. They will not run a wallet
+ceremony, stake VVV, or issue API keys. They buy a **deed** and we handle
+everything behind it:
+
+- **`ConstellationDeed` (ERC-721 "TOMB", LIVE on Base:
+  `0x3939182a7154766634975cac85E3a250d9919Fa8`)** — `mintMoon()` (0.005
+  ETH) houses one avatar; `mintPlanet()` (0.05 ETH) buys a whole
+  neighborhood. Prices steward-adjustable as the product finds its feet.
+  The end-state front end is an iPhone app with Apple Pay; fiat lands,
+  the backend mints the deed to a managed wallet, grandma never sees gas.
+- **Deeds are ordinary NFTs on purpose**: transferable, sellable, and —
+  the whole point — **devisable**. "I give my Constellation Deed #12 to
+  my daughter" is a will clause any probate court can administer. The
+  deed IS the berth; whoever holds it controls the avatar's tenancy.
+- **Universal Basic Compute**: every deed, moon or planet, entitles its
+  avatar to a minimum daily Diem allowance — declared on-chain
+  (`ubcMilliDiem`, currently 100 = 0.1 Diem/day) and enforced by the
+  pool's key-carver. No avatar starves, however small the estate; the
+  richest wonders are built from the commons anyway.
+- Backend (steward) duties per sale: sweep → VVV → stake; carve a
+  UBC-floor key; spawn the moon/planet; `bindPoint()` the Urbit identity
+  to the deed on-chain.
+
+## The lending model (power-user appendix)
+
+For members who *can* run their own stake, the loan of the stream, never
+the river:
 
 - A member stakes VVV **in their own wallet** — principal never moves,
   custody never transfers.

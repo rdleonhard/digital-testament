@@ -1,0 +1,3 @@
+[submodule "constellation/lib/openzeppelin-contracts"]
+	path = constellation/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
