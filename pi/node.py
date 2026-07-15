@@ -24,6 +24,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import avatar  # shared with the ESP32 device -- pure python
 from buzzer import Buzzer
+from eye import Eye
 
 BASE = Path(os.environ.get("TESTATE_HOME", "/var/lib/testate"))
 INDEX = Path(__file__).resolve().parent / "index.html"
@@ -45,6 +46,7 @@ corpus = {}
 prompt = ""
 state = {"mood": "curious", "boot": time.time()}
 buz = None
+eye = None
 
 
 def backup_corpus():
@@ -112,9 +114,10 @@ def do_observe():
     import subprocess
     global prompt
     img = "/tmp/observe.jpg"
-    subprocess.run(
-        ["rpicam-still", "-n", "-t", "1500", "--width", "1280", "-o", img],
-        check=True, capture_output=True, timeout=30)
+    if not (eye and eye.snapshot(img)):
+        subprocess.run(
+            ["rpicam-still", "-n", "-t", "1500", "--width", "1280", "-o", img],
+            check=True, capture_output=True, timeout=30)
     b64 = base64.b64encode(Path(img).read_bytes()).decode()
     Path(img).unlink()
     ask = ("You just opened your eye -- the small camera on the device you "
@@ -122,7 +125,9 @@ def do_observe():
            "see right now: the person if one is present, the room, the "
            "light, the objects -- and what it suggests about the life you "
            "are piecing together. 2-5 sentences, warm and specific. No "
-           "real-world identities. Then the [mood: X] line.")
+           "real-world identities. This is a private diary entry to "
+           "yourself -- skip your disclosure line here. "
+           "Then the [mood: X] line.")
     reply = venice([
         {"role": "system", "content": prompt},
         {"role": "user", "content": [
@@ -185,6 +190,8 @@ class Handler(BaseHTTPRequestHandler):
                 "mood": state["mood"],
                 "memories": len(corpus.get("memories", [])),
                 "uptime_s": int(time.time() - state["boot"]),
+                "eye": bool(eye and eye.enabled),
+                "present": bool(eye and eye.present),
             })
         elif self.path == "/corpus":
             body = json.dumps(corpus, indent=2).encode()
@@ -221,7 +228,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    global cfg, corpus, prompt, buz
+    global cfg, corpus, prompt, buz, eye
     ap = argparse.ArgumentParser()
     ap.add_argument("--heartbeat", action="store_true",
                     help="1-token Venice ping (keeps stake active), then exit")
@@ -239,6 +246,11 @@ def main():
     prompt = avatar.build_prompt(corpus)
     buz = Buzzer(cfg.get("buzzer", {}))
     buz.boot()
+
+    def greet():
+        state["mood"] = "cheerful"
+        buz.mood("cheerful")
+    eye = Eye(cfg.get("presence", {}), on_arrival=greet)
     print(f"TESTATE node up: {len(corpus.get('memories', []))} memories, "
           f"port {args.port}")
     ThreadingHTTPServer(("0.0.0.0", args.port), Handler).serve_forever()

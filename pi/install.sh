@@ -6,19 +6,21 @@
 set -e
 
 apt-get update -qq
-apt-get install -y -qq --no-install-recommends avahi-daemon python3-gpiozero python3-lgpio
+apt-get install -y -qq --no-install-recommends avahi-daemon python3-gpiozero python3-lgpio \
+    python3-picamera2 imx500-all rpicam-apps
 
 install -d /opt/testate
-install -m 644 node.py buzzer.py avatar.py index.html /opt/testate/
+install -m 644 node.py buzzer.py avatar.py eye.py autoportrait.py index.html /opt/testate/
 
 install -d -o testate -g testate /var/lib/testate /var/lib/testate/backups
 # never clobber a living corpus
 [ -f /var/lib/testate/config.json ] || install -m 600 -o testate -g testate config.json /var/lib/testate/
 [ -f /var/lib/testate/corpus.json ] || install -m 600 -o testate -g testate corpus.json /var/lib/testate/
 
-install -m 644 testate.service testate-heartbeat.service testate-heartbeat.timer /etc/systemd/system/
+install -m 644 testate.service testate-heartbeat.service testate-heartbeat.timer \
+    testate-observe.service testate-observe.timer /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable --now avahi-daemon testate.service testate-heartbeat.timer
+systemctl enable --now avahi-daemon testate.service testate-heartbeat.timer testate-observe.timer
 
 sleep 2
 systemctl --no-pager --lines=5 status testate.service

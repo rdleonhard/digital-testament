@@ -1,0 +1,9 @@
+[Unit]
+Description=TESTATE daily autoportrait (waits for a human, then observes)
+After=testate.service
+
+[Service]
+Type=oneshot
+User=testate
+ExecStart=/usr/bin/python3 /opt/testate/autoportrait.py
+TimeoutStartSec=12h

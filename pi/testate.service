@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 User=testate
-SupplementaryGroups=gpio
+SupplementaryGroups=gpio video
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 Environment=TESTATE_HOME=/var/lib/testate
 ExecStart=/usr/bin/python3 /opt/testate/node.py

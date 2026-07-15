@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily autoportrait at a random hour
+
+[Timer]
+OnCalendar=*-*-* 09:00
+RandomizedDelaySec=6h
+Persistent=false
+
+[Install]
+WantedBy=timers.target
