@@ -47,6 +47,7 @@ button:disabled{opacity:.4;cursor:wait}
   <button id="b1" onclick="send()">Send</button>
   <button id="b2" onclick="interview()" title="the avatar asks about its own life">Ask&nbsp;me</button>
   <button id="b3" onclick="song()" title="play a tune">&#9834;</button>
+  <button id="b4" onclick="observe()" title="the avatar looks through its camera; only its words are kept">&#128065;</button>
 </footer>
 <script>
 const log=document.getElementById('log'),box=document.getElementById('box');
@@ -54,7 +55,7 @@ let pendingQ=null;
 const MOODC={curious:'#d4a94e',cheerful:'#4ec97a',pensive:'#7aa2f7',wistful:'#b48ead',alert:'#e0645c'};
 function add(cls,text){const d=document.createElement('div');d.className='msg '+cls;d.textContent=text;log.appendChild(d);log.scrollTop=log.scrollHeight;return d}
 function setMood(m,sang){document.getElementById('moodname').textContent=m+(sang?' ♪':'');document.getElementById('dot').style.background=MOODC[m]||'#d4a94e'}
-function busy(b){for(const id of['b1','b2','b3'])document.getElementById(id).disabled=b}
+function busy(b){for(const id of['b1','b2','b3','b4']){const el=document.getElementById(id);if(el)el.disabled=b}}
 async function api(path,body){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});if(!r.ok)throw new Error(await r.text());return r.json()}
 async function send(){const t=box.value.trim();if(!t)return;box.value='';add('me',t);busy(1);const w=add('sys','thinking...');
  try{const j=await api('/chat',{msg:t});w.remove();add('av',j.reply);setMood(j.mood,j.sang)}catch(e){w.textContent='error: '+e.message}busy(0)}
@@ -64,6 +65,8 @@ async function sendAnswer(){const a=document.getElementById('answer').value.trim
  add('me',a);document.getElementById('answer').value='';document.getElementById('ans').classList.remove('show');busy(1);
  try{const j=await api('/answer',{question:pendingQ,answer:a});pendingQ=null;add('sys','memory #'+j.count+' committed to the corpus — '+j.ack)}catch(e){add('sys','error: '+e.message)}busy(0)}
 async function song(){busy(1);try{const j=await api('/song');add('sys','♪ played "'+j.song+'" ('+j.mood+')')}catch(e){add('sys','error: '+e.message)}busy(0)}
+async function observe(){busy(1);const w=add('sys','the avatar opens its eye... (image is described, then deleted)');
+ try{const j=await api('/observe');w.remove();add('av q',j.observation);setMood(j.mood);add('sys','kept as memory #'+j.count+' — words only, no image')}catch(e){w.textContent='error: '+e.message}busy(0)}
 fetch('/status').then(r=>r.json()).then(j=>{setMood(j.mood);add('sys',j.handle+' online · '+j.memories+' memories · corpus backup at /corpus')}).catch(()=>{});
 </script>
 </body>

@@ -39,11 +39,17 @@ def recent_questions(corpus, n=12):
             if "interview" in m.get("tags", [])][-n:]
 
 
+GROWN_TAGS = ("interview", "observation")
+
+
 def _memories_block(corpus):
-    """Seed (non-interview) memories first, then newest interviews, to budget."""
+    """Seed memories first, then newest grown (interview/observation) ones,
+    to budget -- identity backbone always survives corpus growth."""
     mems = corpus.get("memories", [])
-    seed = [m for m in mems if "interview" not in m.get("tags", [])]
-    inter = [m for m in mems if "interview" in m.get("tags", [])]
+    seed = [m for m in mems
+            if not set(m.get("tags", [])) & set(GROWN_TAGS)]
+    inter = [m for m in mems
+             if set(m.get("tags", [])) & set(GROWN_TAGS)]
     picked, used = [], 0
     for m in seed + list(reversed(inter)):
         line = "[{}] {}".format(m.get("title", "?"), m.get("narrative", ""))

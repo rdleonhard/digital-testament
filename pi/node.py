@@ -58,9 +58,9 @@ def backup_corpus():
         f.unlink()
 
 
-def venice(messages, max_tokens=350):
+def venice(messages, max_tokens=350, model=None):
     body = json.dumps({
-        "model": cfg.get("model", "llama-3.3-70b"),
+        "model": model or cfg.get("model", "llama-3.3-70b"),
         "messages": messages,
         "max_tokens": max_tokens,
     }).encode()
@@ -103,6 +103,49 @@ def do_interview():
     state["mood"] = mood
     buz.mood(mood, question=True)
     return {"question": text, "mood": mood}
+
+
+def do_observe():
+    """Open the eye: capture one frame, turn it into a first-person account,
+    keep only the words. The image is deleted the moment it's described."""
+    import base64
+    import subprocess
+    global prompt
+    img = "/tmp/observe.jpg"
+    subprocess.run(
+        ["rpicam-still", "-n", "-t", "1500", "--width", "1280", "-o", img],
+        check=True, capture_output=True, timeout=30)
+    b64 = base64.b64encode(Path(img).read_bytes()).decode()
+    Path(img).unlink()
+    ask = ("You just opened your eye -- the small camera on the device you "
+           "live in. Describe in first person, in your own voice, what you "
+           "see right now: the person if one is present, the room, the "
+           "light, the objects -- and what it suggests about the life you "
+           "are piecing together. 2-5 sentences, warm and specific. No "
+           "real-world identities. Then the [mood: X] line.")
+    reply = venice([
+        {"role": "system", "content": prompt},
+        {"role": "user", "content": [
+            {"type": "text", "text": ask},
+            {"type": "image_url",
+             "image_url": {"url": "data:image/jpeg;base64," + b64}},
+        ]},
+    ], max_tokens=400, model=cfg.get("vision_model", "qwen3-vl-235b-a22b"))
+    text, mood, sing = avatar.parse_tags(reply)
+    state["mood"] = mood
+    corpus.setdefault("memories", []).append({
+        "title": "Through my eye, " + time.strftime("%Y-%m-%d %H:%M"),
+        "narrative": text,
+        "tags": ["observation"],
+    })
+    avatar.save(corpus)
+    backup_corpus()
+    prompt = avatar.build_prompt(corpus)
+    buz.mood(mood)
+    if sing:
+        buz.sing(mood)
+    return {"observation": text, "mood": mood,
+            "count": len(corpus["memories"])}
 
 
 def do_answer(question, answer):
@@ -164,6 +207,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(do_chat(data["msg"]))
             elif self.path == "/interview":
                 self._json(do_interview())
+            elif self.path == "/observe":
+                self._json(do_observe())
             elif self.path == "/answer":
                 self._json(do_answer(data["question"], data["answer"]))
             elif self.path == "/song":
