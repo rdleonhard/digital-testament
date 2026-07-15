@@ -1,15 +1,22 @@
-"""Passive-buzzer voice for the Pi node (gpiozero/lgpio software PWM).
+"""Passive-buzzer voice for the Pi node (gpiozero/lgpio software PWM),
+or a remote network voice box (an ESP32 running device/voicebox.py).
 
 Wiring options (config "buzzer" section):
   {"pin": 4, "common": "3v3"}  buzzer between 3V3 and GPIO4 -- idle HIGH
   {"pin": 4, "common": "gnd"}  buzzer between GND and GPIO4 -- idle LOW
   {"common": "off"}            no buzzer; all calls become no-ops
+  {"remote": "http://testate-voice.local"}
+                               POST moods/songs to a voice-box satellite;
+                               fire-and-forget threads, failures swallowed
 
 Melody tables duplicated from device/tunes.py (which is MicroPython-bound);
 keep them in sync if you change one. All tunes original.
 """
 
+import json
+import threading
 import time
+import urllib.request
 
 N = {
     "C4": 262, "D4": 294, "E4": 330, "F4": 349, "G4": 392, "A4": 440,
@@ -54,9 +61,10 @@ BOOT_CHIRP = _seq(("C5", 80), ("G5", 80), ("C6", 160))
 class Buzzer:
     def __init__(self, conf=None):
         conf = conf or {}
+        self.remote = conf.get("remote", "").rstrip("/") or None
         self.common = conf.get("common", "3v3")
         self.dev = None
-        if self.common == "off":
+        if self.remote or self.common == "off":
             return
         try:
             from gpiozero import PWMOutputDevice
@@ -66,7 +74,23 @@ class Buzzer:
         except Exception as e:
             print(f"buzzer disabled ({e}); running silent")
 
+    def _post(self, path, obj):
+        """Fire-and-forget so a sleepy satellite never slows the avatar."""
+        def go():
+            try:
+                req = urllib.request.Request(
+                    self.remote + path, data=json.dumps(obj).encode(),
+                    headers={"Content-Type": "application/json"},
+                    method="POST")
+                urllib.request.urlopen(req, timeout=8).close()
+            except Exception as e:
+                print(f"voicebox unreachable ({e})")
+        threading.Thread(target=go, daemon=True).start()
+
     def play(self, notes, gap_ms=30):
+        if self.remote:
+            self._post("/play", {"notes": notes})
+            return
         if not self.dev:
             return
         try:
