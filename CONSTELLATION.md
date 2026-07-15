@@ -87,9 +87,9 @@ member  ──────► flashes a node (pi/ or device/), drops in
 |---|---|
 | Pool economics (stake → shared Diem) | mechanism real, verified against Venice API |
 | Per-key consumption limits | `pool/keys.py`, needs the pool's admin key |
-| `ConstellationPool` contract | written + tested (`constellation/`), **not yet deployed** |
-| Moon spawning | requires the planet's ship running; free once booted |
-| Avatar ↔ Urbit chat bridge | `pi/urbit_bridge.py` stub, inert until a pier exists |
+| `ConstellationPool` contract | **LIVE on Base mainnet** `0x2Ca8…9e05`, 11 tests pass |
+| Moon spawning | vere 4.6 installed on the Pi; pier awaits the planet keyfile |
+| Avatar ↔ Urbit chat bridge | `pi/urbit_bridge.py` stub, inert until the pier boots |
 | VVV conversion/staking | manual steward action, same as the solo tomb |
 
 ## Steward duties (the will clause maps here)
