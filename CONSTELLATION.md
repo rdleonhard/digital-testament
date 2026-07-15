@@ -31,9 +31,17 @@ Why pooling beats solo endowments:
 
 ## The Urbit layer
 
-The steward's point is **`~fotsut-tintyn`** — note: a two-segment name is a
-**planet** (32-bit point), not a star. Planets cannot spawn planets. But
-this is better news than it sounds:
+The network root is the star **`~sibpub`** (point 4006). Each pool is a
+**planet** issued from it — Constellation #1 is **`~fotsut-tintyn`**,
+verified on Azimuth as ~sibpub's first and only spawn. Each member avatar
+is a **moon** of its pool's planet. Address space as org chart:
+
+```
+~sibpub (star)  ──spawns──►  ~fotsut-tintyn (planet, pool #1)  ──spawns──►  member moons
+                             ~<next-planet>  (pool #2)          ──spawns──►  ...
+```
+
+Why moons for members (rather than selling planets directly):
 
 - A planet spawns **2³² moons, free, off-chain, instantly** (`|moon` on the
   ship — no gas, no L1 transaction). Every dollar of a member's berth goes
@@ -50,9 +58,16 @@ this is better news than it sounds:
   (`assignMoon`), binding the crypto membership to the Urbit identity —
   provenance without doxxing (a moon name reveals nothing).
 
-If the system outgrows the planet (>4B moons is not the constraint; social
-weight is), the upgrade path is buying an actual star and promoting members
-to planets — the contract doesn't care, only `assignMoon` strings change.
+When a pool's social weight outgrows its planet, ~sibpub spawns the next
+planet and a fresh ConstellationPool deploys for it — star ~sibpub can
+issue 65,535 pools before the model strains. NOTE (verified on-chain
+2026-07-15): both points are L1-owned by 0x577d6f16…, and the steward's
+stated address 0x33Ee… holds no Azimuth role — future planet-spawning
+needs the actual owner key or a spawn proxy set via bridge.urbit.org.
+
+**Deployed**: Constellation #1 pool lives on Base mainnet at
+`0x2Ca89dcb5f58B9494b10Af554aFFf61aCe519e05` (planet ~fotsut-tintyn,
+min berth 0.005 ETH, steward 0x70f7…bcC7).
 
 ## The flow
 

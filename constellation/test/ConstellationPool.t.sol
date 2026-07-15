@@ -14,9 +14,13 @@ contract ConstellationPoolTest is Test {
     receive() external payable {} // steward must be able to receive sweep
 
     function setUp() public {
-        pool = new ConstellationPool(MIN);
+        pool = new ConstellationPool(MIN, "~fotsut-tintyn");
         vm.deal(alice, 1 ether);
         vm.deal(bob, 1 ether);
+    }
+
+    function test_planetRecorded() public view {
+        assertEq(pool.planet(), "~fotsut-tintyn");
     }
 
     function test_claimBerth() public {

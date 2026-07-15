@@ -15,6 +15,9 @@ pragma solidity ^0.8.24;
 contract ConstellationPool {
     address public immutable steward;
     uint256 public immutable minBerthWei;
+    /// @notice The Urbit planet hosting this pool's commons; itself issued
+    ///         from the network's star (~sibpub). Members' moons hang here.
+    string public planet;
 
     struct Berth {
         uint128 endowedWei; // lifetime contribution
@@ -41,9 +44,10 @@ contract ConstellationPool {
         _;
     }
 
-    constructor(uint256 _minBerthWei) {
+    constructor(uint256 _minBerthWei, string memory _planet) {
         steward = msg.sender;
         minBerthWei = _minBerthWei;
+        planet = _planet;
     }
 
     /// @notice Claim a berth for yourself. `moniker` is the pseudonymous
