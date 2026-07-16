@@ -113,6 +113,11 @@ def main():
         time.sleep(PAUSE_S)
 
     try:
+        node("/whisper", {"text": "twilight ends: {} thoughts spent before "
+                          "the epoch turns".format(calls)})
+    except Exception:
+        pass
+    try:
         node("/song")  # the tomb sings itself to sleep
     except Exception:
         pass

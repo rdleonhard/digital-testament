@@ -28,13 +28,28 @@ button:hover{border-color:var(--gold)}
 button:disabled{opacity:.4;cursor:wait}
 #ans{display:none;padding:0 16px 12px;gap:8px}
 #ans.show{display:flex}
+#feedbtn{background:none;border:1px solid var(--line);border-radius:8px;color:var(--gold);padding:2px 10px;font:inherit;cursor:pointer;margin-left:10px}
+#feedbtn:hover{border-color:var(--gold)}
+#feed{display:none;max-height:38vh;overflow-y:auto;border-bottom:1px solid var(--line);background:var(--panel);padding:10px 16px}
+#feed.show{display:block}
+#feedhead{color:var(--gold);font-size:12px;letter-spacing:.12em;margin-bottom:8px}
+#feedhead span{color:var(--dim);letter-spacing:0}
+.wh{padding:6px 0;border-bottom:1px dashed var(--line);font-size:13px}
+.wh:last-child{border-bottom:none}
+.wh time{color:var(--dim);font-size:11px;margin-right:8px}
+.wh .fail{color:#e0645c;font-size:11px;margin-left:6px}
 </style>
 </head>
 <body>
 <header>
   <h1>TESTATE&middot;0</h1>
+  <button id="feedbtn" onclick="toggleFeed()" title="whispers sent to the planet">&#9790;</button>
   <span id="mood"><span id="dot"></span><b id="moodname">waking</b></span>
 </header>
+<div id="feed">
+  <div id="feedhead">whispers to the planet <span id="feedship"></span></div>
+  <div id="feedlist"></div>
+</div>
 <div id="log">
   <div class="msg sys">self-hosted avatar node &middot; corpus lives on this device &middot; pseudonymous by design</div>
 </div>
@@ -59,15 +74,32 @@ function busy(b){for(const id of['b1','b2','b3','b4']){const el=document.getElem
 async function api(path,body){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});if(!r.ok)throw new Error(await r.text());return r.json()}
 async function send(){const t=box.value.trim();if(!t)return;box.value='';add('me',t);busy(1);const w=add('sys','thinking...');
  try{const j=await api('/chat',{msg:t});w.remove();add('av',j.reply);setMood(j.mood,j.sang)}catch(e){w.textContent='error: '+e.message}busy(0)}
+async function refreshAskLabel(){try{const j=await(await fetch('/status')).json();
+ document.getElementById('b2').innerHTML=j.pending>0?'Ask&nbsp;me&nbsp;('+j.pending+')':'Ask&nbsp;me'}catch(e){}}
 async function interview(){busy(1);const w=add('sys','the avatar is wondering about itself...');
- try{const j=await api('/interview');w.remove();pendingQ=j.question;add('av q',j.question);setMood(j.mood);document.getElementById('ans').classList.add('show');document.getElementById('answer').focus()}catch(e){w.textContent='error: '+e.message}busy(0)}
+ try{const j=await api('/interview');w.remove();pendingQ=j.question;add('av q',j.question);setMood(j.mood);document.getElementById('ans').classList.add('show');document.getElementById('answer').focus();refreshAskLabel()}catch(e){w.textContent='error: '+e.message}busy(0)}
 async function sendAnswer(){const a=document.getElementById('answer').value.trim();if(!a||!pendingQ)return;
  add('me',a);document.getElementById('answer').value='';document.getElementById('ans').classList.remove('show');busy(1);
  try{const j=await api('/answer',{question:pendingQ,answer:a});pendingQ=null;add('sys','memory #'+j.count+' committed to the corpus — '+j.ack)}catch(e){add('sys','error: '+e.message)}busy(0)}
 async function song(){busy(1);try{const j=await api('/song');add('sys','♪ played "'+j.song+'" ('+j.mood+')')}catch(e){add('sys','error: '+e.message)}busy(0)}
 async function observe(){busy(1);const w=add('sys','the avatar opens its eye... (image is described, then deleted)');
  try{const j=await api('/observe');w.remove();add('av q',j.observation);setMood(j.mood);add('sys','kept as memory #'+j.count+' — words only, no image')}catch(e){w.textContent='error: '+e.message}busy(0)}
-fetch('/status').then(r=>r.json()).then(j=>{setMood(j.mood);add('sys',j.handle+' online · '+j.memories+' memories · corpus backup at /corpus')}).catch(()=>{});
+let feedTimer=null;
+async function loadFeed(){const list=document.getElementById('feedlist');
+ try{const r=await fetch('/whispers');const j=await r.json();list.innerHTML='';
+  if(!j.whispers.length){list.textContent='(nothing whispered yet — reflections post at twilight)';return}
+  for(const w of j.whispers){const d=document.createElement('div');d.className='wh';
+   const t=document.createElement('time');t.textContent=w.ts.replace('T',' ');d.appendChild(t);
+   d.appendChild(document.createTextNode(w.text));
+   if(!w.ok){const s=document.createElement('span');s.className='fail';s.textContent='(unheard: '+(w.err||'?')+')';d.appendChild(s)}
+   else if(w.err){const s=document.createElement('span');s.className='fail';s.style.color='#4ec97a';s.textContent='('+w.err+')';d.appendChild(s)}
+   list.appendChild(d)}
+ }catch(e){list.textContent='feed error: '+e.message}}
+function toggleFeed(){const f=document.getElementById('feed');
+ if(f.classList.contains('show')){f.classList.remove('show');clearInterval(feedTimer);feedTimer=null;return}
+ f.classList.add('show');document.getElementById('feedlist').textContent='listening...';
+ loadFeed();feedTimer=setInterval(loadFeed,30000)}
+fetch('/status').then(r=>r.json()).then(j=>{setMood(j.mood);const u=j.urbit&&j.urbit.enabled?' · ship '+j.urbit.ship:'';document.getElementById('feedship').textContent=u;if(j.pending>0)document.getElementById('b2').innerHTML='Ask&nbsp;me&nbsp;('+j.pending+')';add('sys',j.handle+' online · '+j.memories+' memories'+u+' · corpus backup at /corpus')}).catch(()=>{});
 </script>
 </body>
 </html>

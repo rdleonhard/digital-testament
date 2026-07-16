@@ -20,7 +20,7 @@ from http.cookiejar import CookieJar
 
 
 class UrbitBridge:
-    def __init__(self, conf):
+    def __init__(self, conf, log_path=None):
         conf = conf or {}
         self.url = conf.get("url", "").rstrip("/")
         self.code = conf.get("code")
@@ -28,10 +28,41 @@ class UrbitBridge:
         self.moon = conf.get("moon", "")
         self.enabled = bool(self.url and self.code and self.ship)
         self.last_error = None
+        self.log_path = str(log_path) if log_path else None
         self._opener = None
         self._channel = None
         self._id = 0
         self._lock = threading.Lock()
+        self._retry = []  # [(text, tries), ...] whispers the ship hasn't heard
+        self._retry_thread = None
+
+    def _log(self, text, ok, err=None):
+        if not self.log_path:
+            return
+        entry = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                 "text": text, "ok": ok, "err": err}
+        try:
+            with open(self.log_path, "a") as f:
+                f.write(json.dumps(entry) + "\n")
+        except OSError as e:
+            print(f"whisper log write failed: {e}")
+
+    def recent(self, n=50):
+        if not self.log_path:
+            return []
+        try:
+            with open(self.log_path) as f:
+                lines = f.readlines()[-n:]
+        except OSError:
+            return []
+        out = []
+        for ln in lines:
+            try:
+                out.append(json.loads(ln))
+            except ValueError:
+                pass
+        out.reverse()  # newest first
+        return out
 
     # -- plumbing ---------------------------------------------------------
 
@@ -72,6 +103,32 @@ class UrbitBridge:
                     raise
             self.last_error = None
 
+    def _queue_retry(self, text, tries=0):
+        """A whisper the ship didn't hear waits and tries again --
+        the tomb is patient. Retries every 5 min, gives up after 12."""
+        if len(self._retry) >= 50:
+            return
+        self._retry.append((text, tries))
+        if self._retry_thread is None or not self._retry_thread.is_alive():
+            self._retry_thread = threading.Thread(
+                target=self._retry_loop, daemon=True)
+            self._retry_thread.start()
+
+    def _retry_loop(self):
+        while self._retry:
+            time.sleep(300)
+            batch, self._retry = self._retry, []
+            for text, tries in batch:
+                try:
+                    self._poke("hood", "helm-hi", text[:300])
+                    self._log(text, True, err="heard on retry %d" % (tries + 1))
+                except Exception as e:
+                    if tries + 1 >= 12:
+                        self._log(text, False, "gave up after 12 retries")
+                    else:
+                        self._retry.append((text, tries + 1))
+                        self.last_error = str(e)
+
     # -- avatar-facing ----------------------------------------------------
 
     def whisper(self, text, wait=False):
@@ -83,12 +140,20 @@ class UrbitBridge:
         def go():
             try:
                 self._poke("hood", "helm-hi", text[:300])
+                self._log(text, True)
             except Exception as e:
                 self.last_error = str(e)
-                print(f"urbit whisper failed: {e}")
+                self._log(text, False, str(e))
+                self._queue_retry(text)
+                print(f"urbit whisper failed (queued for retry): {e}")
 
         if wait:
-            self._poke("hood", "helm-hi", text[:300])
+            try:
+                self._poke("hood", "helm-hi", text[:300])
+                self._log(text, True)
+            except Exception as e:
+                self._log(text, False, str(e))
+                raise
             return True
         threading.Thread(target=go, daemon=True).start()
         return True

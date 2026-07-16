@@ -289,6 +289,8 @@ class Handler(BaseHTTPRequestHandler):
                 "pending": len(corpus.get("pending", [])),
                 "urbit": urb.status() if urb else {"enabled": False},
             })
+        elif self.path == "/whispers":
+            self._json({"whispers": urb.recent() if urb else []})
         elif self.path == "/corpus":
             body = json.dumps(corpus, indent=2).encode()
             self.send_response(200)
@@ -355,7 +357,7 @@ def main():
         state["mood"] = "cheerful"
         buz.mood("cheerful")
     eye = Eye(cfg.get("presence", {}), on_arrival=greet)
-    urb = UrbitBridge(cfg.get("urbit", {}))
+    urb = UrbitBridge(cfg.get("urbit", {}), log_path=BASE / "whispers.jsonl")
     if urb.enabled:
         urb.whisper("the tomb wakes: " + str(
             len(corpus.get("memories", []))) + " memories aboard")
