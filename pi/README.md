@@ -39,6 +39,25 @@ ssh testate@testate.local "cd /tmp/testate && sudo bash install.sh"
   `systemctl list-timers testate-heartbeat.timer`
 - Manual backup off the node: `curl testate.local/corpus > corpus-$(date +%F).json`
 
+## Urbit ships on the node
+
+The Pi comfortably runs the pool's planet and the avatar's moon beside
+the node (two piers ≈ 1.4GB resident). Hard-won boot notes:
+
+- vere needs `-t` in EVERY headless context (nohup, systemd) or it dies
+  with "unable to initialize terminal"; `-x` wedges at 0% CPU — never
+  use it. vere ignores INT/TERM under `-t`; SIGKILL is safe (event log).
+- First boot needs the default 2GB loom — `--loom 30` fails with `%meme`
+  "unable to parse pill". Delete the partial pier before retrying.
+- Re-keying an existing moon is `|moon-cycle-keys ~name` (`|moon` refuses).
+- Headless dojo = `expect` over `ssh -tt` with `stty cols 400` so keyfile
+  jams print unwrapped. Don't anchor prompt regexes (`dojo> $` never
+  matches through the escape-code spam).
+- Moon names are shaped exactly like `+code`s (four 6-letter segments) —
+  when scraping a code, exclude the ship's own name.
+- Kernel updates: if the sponsor star is dark, `|ota ~<galaxy>` walks the
+  chain up. Eyre goes down during kelvin rebuilds — whispers auto-retry.
+
 ## Why a Pi over the ESP32
 
 Storage (a corpus of a life should not live in 16MB of flash with no
