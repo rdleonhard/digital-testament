@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import avatar  # shared with the ESP32 device -- pure python
 from buzzer import Buzzer
 from eye import Eye
+from urbit_bridge import UrbitBridge
 
 BASE = Path(os.environ.get("TESTATE_HOME", "/var/lib/testate"))
 INDEX = Path(__file__).resolve().parent / "index.html"
@@ -47,6 +48,7 @@ prompt = ""
 state = {"mood": "curious", "boot": time.time()}
 buz = None
 eye = None
+urb = None
 
 
 def backup_corpus():
@@ -238,6 +240,9 @@ def do_reflect(kind):
     backup_corpus()
     prompt = avatar.build_prompt(corpus)
     buz.mood(mood)
+    if urb:
+        urb.whisper("{} whispers: {}".format(
+            corpus["identity"].get("preferred_name", "an avatar"), text))
     return {"kind": kind, "title": title, "mood": mood,
             "count": len(mems)}
 
@@ -282,6 +287,7 @@ class Handler(BaseHTTPRequestHandler):
                 "eye": bool(eye and eye.enabled),
                 "present": bool(eye and eye.present),
                 "pending": len(corpus.get("pending", [])),
+                "urbit": urb.status() if urb else {"enabled": False},
             })
         elif self.path == "/corpus":
             body = json.dumps(corpus, indent=2).encode()
@@ -308,6 +314,12 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(do_observe())
             elif self.path == "/reflect":
                 self._json(do_reflect(data.get("kind", "reflection")))
+            elif self.path == "/whisper":
+                if not (urb and urb.enabled):
+                    self._json({"error": "no ship configured"}, 400)
+                else:
+                    urb.whisper(data["text"], wait=True)
+                    self._json({"whispered": data["text"][:100]})
             elif self.path == "/answer":
                 self._json(do_answer(data["question"], data["answer"]))
             elif self.path == "/song":
@@ -320,7 +332,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    global cfg, corpus, prompt, buz, eye
+    global cfg, corpus, prompt, buz, eye, urb
     ap = argparse.ArgumentParser()
     ap.add_argument("--heartbeat", action="store_true",
                     help="1-token Venice ping (keeps stake active), then exit")
@@ -343,6 +355,10 @@ def main():
         state["mood"] = "cheerful"
         buz.mood("cheerful")
     eye = Eye(cfg.get("presence", {}), on_arrival=greet)
+    urb = UrbitBridge(cfg.get("urbit", {}))
+    if urb.enabled:
+        urb.whisper("the tomb wakes: " + str(
+            len(corpus.get("memories", []))) + " memories aboard")
     print(f"TESTATE node up: {len(corpus.get('memories', []))} memories, "
           f"port {args.port}")
     ThreadingHTTPServer(("0.0.0.0", args.port), Handler).serve_forever()

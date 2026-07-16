@@ -1,22 +1,20 @@
-"""Urbit bridge for the TESTATE node -- ship-ready, inert without a pier.
+"""Urbit bridge: the avatar's line to its planet.
 
-When the constellation's planet (~fotsut-tintyn) is booted and each avatar
-has a moon, this client lets a node speak Urbit: authenticate to its
-moon's Eyre HTTP interface, poke agents, and post the avatar's twilight
-reflections into the constellation's group chat.
+Speaks Eyre (the ship's HTTP interface) with lazy login and one retry on
+auth expiry. v1 primitive is whisper(): poke %hood with %helm-hi, which
+prints the text in the planet's console/journal -- the ghost speaking in
+the town square. Channel-chat posting comes once the commons group
+exists (marks are %groups-version dependent).
 
-Config ("urbit" section):
-  {"url": "http://localhost:8080", "code": "<+code>", "ship": "fotsut-tintyn-..."}
-
-Protocol notes (fill marks per your ship's %groups version):
-  - login:      POST {url}/~/login  body "password={code}"  -> urbauth cookie
-  - channel:    PUT  {url}/~/channel/{uid}  json actions
-  - poke:       {"id":1,"action":"poke","ship":ship,"app":app,
-                 "mark":mark,"json":payload}
+Config ("urbit" section of the node config):
+  {"url": "http://127.0.0.1:8085", "ship": "fotsut-tintyn",
+   "code": "<+code>", "moon": "~tolwed-nimlun-fotsut-tintyn"}
 """
 
 import json
+import threading
 import time
+import urllib.error
 import urllib.request
 from http.cookiejar import CookieJar
 
@@ -27,40 +25,78 @@ class UrbitBridge:
         self.url = conf.get("url", "").rstrip("/")
         self.code = conf.get("code")
         self.ship = conf.get("ship")
+        self.moon = conf.get("moon", "")
         self.enabled = bool(self.url and self.code and self.ship)
+        self.last_error = None
+        self._opener = None
+        self._channel = None
         self._id = 0
-        if not self.enabled:
-            return
-        jar = CookieJar()
-        self.opener = urllib.request.build_opener(
-            urllib.request.HTTPCookieProcessor(jar))
-        self.channel = f"{self.url}/~/channel/testate-{int(time.time())}"
-        self._login()
+        self._lock = threading.Lock()
+
+    # -- plumbing ---------------------------------------------------------
 
     def _login(self):
+        jar = CookieJar()
+        opener = urllib.request.build_opener(
+            urllib.request.HTTPCookieProcessor(jar))
         req = urllib.request.Request(
             self.url + "/~/login",
-            data=f"password={self.code}".encode(), method="POST")
-        self.opener.open(req, timeout=15).close()
+            data=("password=" + self.code).encode(), method="POST")
+        opener.open(req, timeout=15).close()
+        self._opener = opener
+        self._channel = "{}/~/channel/testate-{}".format(
+            self.url, int(time.time()))
 
-    def poke(self, app, mark, payload):
+    def _put(self, actions):
+        req = urllib.request.Request(
+            self._channel, data=json.dumps(actions).encode(), method="PUT",
+            headers={"Content-Type": "application/json"})
+        self._opener.open(req, timeout=15).close()
+
+    def _poke(self, app, mark, payload):
+        with self._lock:
+            if self._opener is None:
+                self._login()
+            self._id += 1
+            action = [{
+                "id": self._id, "action": "poke", "ship": self.ship,
+                "app": app, "mark": mark, "json": payload,
+            }]
+            try:
+                self._put(action)
+            except urllib.error.HTTPError as e:
+                if e.code in (401, 403):
+                    self._login()
+                    self._put(action)
+                else:
+                    raise
+            self.last_error = None
+
+    # -- avatar-facing ----------------------------------------------------
+
+    def whisper(self, text, wait=False):
+        """Print `text` in the planet's console (poke %hood %helm-hi).
+        Fire-and-forget by default; wait=True raises on failure."""
         if not self.enabled:
             return False
-        self._id += 1
-        body = json.dumps([{
-            "id": self._id, "action": "poke", "ship": self.ship,
-            "app": app, "mark": mark, "json": payload,
-        }]).encode()
-        req = urllib.request.Request(
-            self.channel, data=body, method="PUT",
-            headers={"Content-Type": "application/json"})
-        self.opener.open(req, timeout=15).close()
+
+        def go():
+            try:
+                self._poke("hood", "helm-hi", text[:300])
+            except Exception as e:
+                self.last_error = str(e)
+                print(f"urbit whisper failed: {e}")
+
+        if wait:
+            self._poke("hood", "helm-hi", text[:300])
+            return True
+        threading.Thread(target=go, daemon=True).start()
         return True
 
-    def post_reflection(self, group_host, channel_name, text):
-        """Post a twilight reflection to the constellation's chat.
-        TODO: shape the payload for your %groups/%chat version's mark."""
-        return self.poke("chat", "chat-action", {
-            "post": {"host": group_host, "channel": channel_name,
-                     "text": text},
-        })
+    def status(self):
+        return {
+            "enabled": self.enabled,
+            "ship": "~" + self.ship if self.ship else None,
+            "moon": self.moon,
+            "last_error": self.last_error,
+        }
