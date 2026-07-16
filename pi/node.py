@@ -241,8 +241,7 @@ def do_reflect(kind):
     prompt = avatar.build_prompt(corpus)
     buz.mood(mood)
     if urb:
-        urb.whisper("{} whispers: {}".format(
-            corpus["identity"].get("preferred_name", "an avatar"), text))
+        urb.post("{} — {}".format(title, text))
     return {"kind": kind, "title": title, "mood": mood,
             "count": len(mems)}
 

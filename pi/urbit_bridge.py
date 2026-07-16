@@ -26,6 +26,7 @@ class UrbitBridge:
         self.code = conf.get("code")
         self.ship = conf.get("ship")
         self.moon = conf.get("moon", "")
+        self.commons = conf.get("commons", "")  # e.g. chat/~planet/reflections
         self.enabled = bool(self.url and self.code and self.ship)
         self.last_error = None
         self.log_path = str(log_path) if log_path else None
@@ -158,10 +159,38 @@ class UrbitBridge:
         threading.Thread(target=go, daemon=True).start()
         return True
 
+    def post(self, text):
+        """Post to the commons channel as the ship (Tlon %groups v7
+        shapes, discovered live via urbit_probe.py). Falls back to a
+        console whisper if the commons rejects or isn't configured."""
+        if not (self.enabled and self.commons):
+            return self.whisper(text)
+        essay = {
+            "content": [{"inline": [text[:1500]]}],
+            "sent": int(time.time() * 1000),
+            "author": "~" + self.ship,
+            "kind": "/chat", "meta": None, "blob": None,
+        }
+        payload = {"channel": {"nest": self.commons,
+                               "action": {"post": {"add": essay}}}}
+
+        def go():
+            try:
+                self._poke("channels", "channel-action-2", payload)
+                self._log("[commons] " + text, True)
+            except Exception as e:
+                self.last_error = str(e)
+                self._log("[commons] " + text, False, str(e))
+                self.whisper(text)  # at least say it to the console
+
+        threading.Thread(target=go, daemon=True).start()
+        return True
+
     def status(self):
         return {
             "enabled": self.enabled,
             "ship": "~" + self.ship if self.ship else None,
             "moon": self.moon,
+            "commons": self.commons or None,
             "last_error": self.last_error,
         }
