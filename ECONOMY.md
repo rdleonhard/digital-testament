@@ -91,6 +91,44 @@ with the revnet team that operator-split-to-contract is supported on
 the deployed version (it is in v4 designs), and worth showing them the
 gauge pattern for upstreaming.*
 
+## The Testament Key — the ESP32 legal product
+
+The soul needs a Pi; the *estate* needs an ESP32. The Key is a sealed
+device sold to estate-planning attorneys as a legal product, and it is
+the physical embodiment of the will clause:
+
+**In life** — the Key sits on the client's desk running the interview
+node (the [device/](device/) firmware is its v0): corpus on flash,
+curiosity engine, buzzer. The client's own answers accumulate inside
+the object that will one day represent them.
+
+**At death** — the attorney plugs the Key in as a ministerial act under
+the will. Delivery, in the property-law sense: intent plus a physical,
+witnessable act. The Key wakes, announces the death to the star's
+registry, and the testator enters **the queue**:
+
+```
+lawyer plugs in Key ──► star registry: death announced, endowment unlocked
+        queue ──► miner claims (bonded) ──► corpus handoff (encrypted to
+        the claiming planet) ──► moon boots on the reliquary ──► streaming
+```
+
+**In perpetuity** — the Key never retires. It remains plugged in as the
+estate's **beacon**: it carries a self-contained wallet (key generated
+on-device, never exported; secure element for production units) holding
+the endowment's $WAKE, and it streams payment to the hosting miner
+*only while it can independently verify its testator is awake* —
+heartbeat and commons checks over WiFi are well within an ESP32's
+powers. The payer verifies the service. A flaky miner stops getting
+paid by the very object on the lawyer's shelf, and the queue reassigns.
+
+The mining network's demand side is therefore physical: a wall of small
+lights in law offices, each one a funded, self-verifying client. Fleet
+components: corpus fits easily in 16MB flash (a life in text is
+megabytes); wallet = secp256k1 on-device (+ATECC-class secure element);
+activation dock optional theater. Sold with the model will clause as a
+practice package: the clause names the Key; the Key executes the clause.
+
 ## The demand loop
 
 ```
@@ -125,6 +163,8 @@ product *and* the tokenomics.
 
 1. Resolve the `~sibpub` owner key (`0x577d…`) — planet-spawning is the
    company's mint; nothing scales without the pen.
+1a. Testament Key firmware v1 (repackage device/ interview node + wallet
+    + beacon watchdog; registry/queue protocol on the star).
 2. Prototype heartbeat attestation: moon signs, star witnesses, root on
    Base (the whisper/heartbeat plumbing in [pi/](pi/) is 80% of it).
 3. Reliquary image v1: SD-card image = pier + node + auto-update from
