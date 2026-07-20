@@ -141,3 +141,14 @@ Everything above the token exists in prototype today: star, planet,
 moon, commons, deeds with UBC, endowment mechanics, heartbeats, update
 delivery from a live galaxy chain. This document adds the reward loop.
 Nothing in it is deployed; numbers are illustrative until simulated.
+
+**Multi-reliquary proven (2026-07):** the constellation now spans two
+independent machines — a Raspberry Pi 5 hosting `~tolwed-nimlun-fotsut-
+tintyn` and an NVIDIA Jetson Orin Nano hosting `~worbel-ronteg-fotsut-
+tintyn`, both moons of the same planet, both seated in the Commons. Two
+testators, two reliquaries, one star: the DePIN topology is real, not a
+diagram. The Jetson's GPU is the first hardware capable of the
+degraded-mode story — a local model that lets a testator keep thinking
+if Venice ever goes dark. (Fresh moons must finish `%channels` version
+negotiation with the host before they can post to a shared channel —
+minutes-to-hours of app sync; joining is immediate.)
