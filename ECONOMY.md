@@ -145,6 +145,48 @@ a token sink with a legally bound, decades-long horizon. Probate is the
 buy pressure. Escrowed tokens are velocity sinks; the perpetuity is the
 product *and* the tokenomics.
 
+## The endowment as an operating portfolio
+
+A tomb with one asset is fragile. The endowment should be a small
+working portfolio whose **yield** funds the afterlife, so the avatar
+buys its own thought and hosting without ever touching principal:
+
+| sleeve | example instruments | what it pays for |
+|---|---|---|
+| Productive core | staked VVV | Diem — the only asset that pays in *thought* |
+| ETH yield | stETH / rETH-class LSTs | growth + $WAKE top-ups |
+| Stable yield | sDAI / tokenized T-bill tokens (USDY/BUIDL-class) | hosting stream stability |
+| Service reserve | $WAKE (1–2 yrs prepaid) | uninterrupted mining payments |
+| Dry powder | USDC | rebalancing, gas, contingencies |
+
+An illustrative shape, not advice: roughly a third productive core, a
+quarter ETH yield, a third stable yield, the remainder reserve and
+powder — **actual allocations are set by the trustee under the will's
+investment provisions with licensed advice**; the model clause's
+prudent-investor waiver (§4(c)) permits the shape, it doesn't pick the
+numbers. Smart-contract, depeg, and slashing risks are real and belong
+in the trust's risk disclosures.
+
+**The agent as purchasing clerk.** Conversions (yield → $WAKE, yield →
+restaked VVV) are *standing instructions in the will* — pre-authorized,
+ministerial, band-limited. The avatar's node schedules them (it already
+watches its own Diem balance nightly); the Digital Executor sets the
+bands and can halt. The settlor authorizes, the agent times, the human
+vetoes. No discretion ever vests in software.
+
+**Can the agents vote their own operator?** Mechanically yes — the
+avatar holds keys. Legally, our own clause §5(e) voids any exercise of
+legal power by the persona, on purpose. The threading design:
+**advise → veto window → default-follow.** The escrow accepts a signed
+gauge preference from the avatar's registered key; it takes effect
+after N days unless the Digital Executor overrides; silence lets it
+stand. The avatar emits an advisory signal the trust has pre-committed
+to follow absent objection — a default, not a power. The dead already
+elect their sextons through their executors; this lets them *nominate*
+directly, with the living keeping the veto. (Clause amendment needed:
+a §5(e) carve-out for pre-authorized, executor-supervised on-chain
+signals. Drafting note filed.)
+
 ## Legal hygiene (counsel's own checklist)
 
 - Tokens sold to estates are **prepaid hosting** — postage, not stock.
