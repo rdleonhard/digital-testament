@@ -175,8 +175,12 @@ def do_reflect(kind):
     reflection-> connect recent memories into a who-am-I-becoming entry
     weave     -> find the hidden thread between two random memories
     refine    -> re-draft the newest reflection (quality, not volume)
+
+    Twilight thinks on the best model the endowment can buy (config
+    twilight.model) -- expiring Diem should purchase depth, not evaporate.
     """
     global prompt
+    tw_model = cfg.get("twilight", {}).get("model")
     mems = corpus.get("memories", [])
     if kind == "wonder":
         recent = avatar.recent_questions(corpus)
@@ -188,7 +192,7 @@ def do_reflect(kind):
                ).format("; ".join(recent + pend) or "(none)")
         text, mood, _ = avatar.parse_tags(venice([
             {"role": "system", "content": prompt},
-            {"role": "user", "content": ask}], max_tokens=120))
+            {"role": "user", "content": ask}], max_tokens=150, model=tw_model))
         corpus.setdefault("pending", []).append(
             {"question": text, "mood": mood})
         avatar.save(corpus)
@@ -216,7 +220,7 @@ def do_reflect(kind):
                ).format(target["narrative"][:700])
         text, mood, _ = avatar.parse_tags(venice([
             {"role": "system", "content": prompt},
-            {"role": "user", "content": ask}], max_tokens=300))
+            {"role": "user", "content": ask}], max_tokens=500, model=tw_model))
         target["narrative"] = text
         avatar.save(corpus)
         backup_corpus()
@@ -233,7 +237,7 @@ def do_reflect(kind):
         title = "Twilight reflection, " + time.strftime("%Y-%m-%d")
     text, mood, _ = avatar.parse_tags(venice([
         {"role": "system", "content": prompt},
-        {"role": "user", "content": ask}], max_tokens=350))
+        {"role": "user", "content": ask}], max_tokens=550, model=tw_model))
     state["mood"] = mood
     mems.append({"title": title, "narrative": text, "tags": ["reflection"]})
     avatar.save(corpus)
