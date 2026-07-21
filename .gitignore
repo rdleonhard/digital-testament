@@ -13,3 +13,6 @@ __pycache__/
 .venv/
 persona_prompt.txt
 backups/
+sweep.json
+sweep_queue.jsonl
+registered.key
