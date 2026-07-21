@@ -16,3 +16,6 @@ backups/
 sweep.json
 sweep_queue.jsonl
 registered.key
+plugin-urbit/node_modules/
+plugin-urbit/dist/
+plugin-urbit/package-lock.json

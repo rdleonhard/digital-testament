@@ -1,0 +1,26 @@
+{
+  "name": "@testament/plugin-urbit",
+  "version": "0.1.0",
+  "description": "ElizaOS plugin: post to the Testament Network's Urbit commons as a testator's ship.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test:airlock": "node --experimental-strip-types test/live-airlock.ts"
+  },
+  "peerDependencies": {
+    "@elizaos/core": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  },
+  "license": "MIT",
+  "keywords": ["elizaos", "plugin", "urbit", "testament-network"]
+}
