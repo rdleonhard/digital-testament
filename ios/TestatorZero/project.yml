@@ -1,0 +1,38 @@
+name: TestatorZero
+options:
+  bundleIdPrefix: com.openesquire
+  deploymentTarget:
+    iOS: "17.0"
+targets:
+  TestatorZero:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    resources:
+      - path: Secrets.plist
+        optional: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.openesquire.testatorzero
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: "Your avatar listens so your memories can be spoken, not typed."
+        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: "Speech is transcribed on-device into memories for your corpus."
+        INFOPLIST_KEY_NSCameraUsageDescription: "The avatar looks through your camera to describe a moment; only its words are kept, never the image."
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIUserInterfaceStyle: Dark
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGNING_ALLOWED: NO
+schemes:
+  TestatorZero:
+    build:
+      targets:
+        TestatorZero: all
+    run:
+      config: Debug
+      storeKitConfiguration: TestatorZero.storekit

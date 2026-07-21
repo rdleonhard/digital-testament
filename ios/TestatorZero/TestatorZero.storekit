@@ -1,0 +1,66 @@
+{
+  "identifier" : "F0E1D2C3-0000-4000-8000-TESTATORZERO",
+  "nonRenewingSubscriptions" : [],
+  "products" : [],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : []
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21000001",
+      "localizations" : [],
+      "name" : "Remembrance",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "9.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "21000002",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Daily thinking for your avatar. Private inference.",
+              "displayName" : "Remembrance Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "zero.remembrance.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Remembrance Monthly",
+          "subscriptionGroupID" : "21000001",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "99.00",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "21000003",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "A year of your avatar's thinking. Two months free.",
+              "displayName" : "Remembrance Yearly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "zero.remembrance.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Remembrance Yearly",
+          "subscriptionGroupID" : "21000001",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}
