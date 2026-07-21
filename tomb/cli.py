@@ -3,15 +3,17 @@
     tomb convert 25000              plan a USD -> VVV -> Diem endowment
     tomb provision --owner "..."    issue/record the estate inference key
     tomb build corpus.json          validate corpus, emit persona prompt
+    tomb eliza corpus.json          export an ElizaOS character file
     tomb chat corpus.json           converse with the Digital Persona
     tomb heartbeat                  minimal ping to stay an active staker
 """
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
-from . import __version__, chat, convert, persona, provision
+from . import __version__, chat, convert, eliza, persona, provision
 
 
 def main(argv=None) -> int:
@@ -44,6 +46,11 @@ def main(argv=None) -> int:
     b.add_argument("corpus", help="path to corpus JSON")
     b.add_argument("-o", "--out", default=None,
                    help="write prompt to file instead of stdout")
+
+    el = sub.add_parser("eliza", help="export an ElizaOS character file")
+    el.add_argument("corpus", help="path to corpus JSON")
+    el.add_argument("-o", "--out", default=None,
+                    help="write character JSON to file instead of stdout")
 
     ch = sub.add_parser("chat", help="converse with the Digital Persona")
     ch.add_argument("corpus", help="path to corpus JSON")
@@ -90,6 +97,17 @@ def main(argv=None) -> int:
                   f"({len(prompt):,} chars)")
         else:
             print(prompt)
+
+    elif args.cmd == "eliza":
+        character = eliza.export(args.corpus)
+        text = json.dumps(character, indent=2, ensure_ascii=False)
+        if args.out:
+            Path(args.out).write_text(text + "\n")
+            print(f"ElizaOS character written to {args.out} "
+                  f"({character['name']}, {len(character['lore'])} lore, "
+                  f"{len(character['knowledge'])} knowledge entries)")
+        else:
+            print(text)
 
     elif args.cmd == "chat":
         corpus = persona.load_corpus(args.corpus)

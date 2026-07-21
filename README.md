@@ -82,6 +82,9 @@ python3 -m tomb provision --owner "Estate of Arthur R. Vale, Digital Persona Tru
 # 3. Build the persona from the Digital Corpus
 python3 -m tomb build examples/corpus.example.json -o persona_prompt.txt
 
+# 3b. Or export to an ElizaOS character (richer runtime, multi-channel)
+python3 -m tomb eliza examples/corpus.example.json -o character.json
+
 # 4. Converse with the deceased (spends the daily Diem)
 export VENICE_API_KEY=...
 python3 -m tomb chat examples/corpus.example.json
@@ -130,9 +133,10 @@ in the whole project.
 - [x] Sight — IMX500 presence greetings + daily autoportrait diary
 - [x] Twilight ritual — expiring Diem spent on reflection, question-banking,
       and memory-weaving before each epoch turns
-- [ ] Persona runtime on an open agent framework ([ElizaOS](https://github.com/elizaOS/eliza)
-      character files map cleanly onto the corpus schema) for memory,
-      multi-channel access, and richer behavior
+- [x] Persona runtime on an open agent framework — `tomb eliza` exports a
+      [corpus](schema/corpus.schema.json) to an [ElizaOS](https://github.com/elizaOS/eliza)
+      character file, guardrails intact, for memory, plugins, and
+      multi-channel presence (Discord/Telegram/web)
 - [ ] Corpus ingestion helpers (mbox/email export → memories & writing samples)
 - [ ] On-chain endowment attestation (Base) linking the trust wallet, the
       corpus hash, and the will's memorandum — kin to
