@@ -51,6 +51,13 @@ struct TestatorZeroApp: App {
     // and there's Diem to spend on the user's own key, reflect quietly.
     // (iOS can't guarantee a timed background wake, so we seize the open.)
     private func maybeTwilight() async {
+        // keep the daily ritual notification fresh with the latest banked question
+        if settings.dailyRitual, let c = store.corpus {
+            NotificationManager.scheduleDaily(
+                hour: settings.ritualHour,
+                question: c.pending.first?.question,
+                name: c.identity.preferred_name ?? c.identity.full_name)
+        }
         guard settings.autoTwilight, settings.usingOwnKey, store.corpus != nil else { return }
         if let last = settings.lastTwilight, Date().timeIntervalSince(last) < 3600 { return }
         guard let key = VeniceClient.activeKey(customKey: settings.customKey,
@@ -78,19 +85,31 @@ struct RootView: View {
 }
 
 struct MainTabView: View {
+    @EnvironmentObject var store: CorpusStore
+    @State private var tab = 0
+
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
             ChatView()
                 .tabItem { Label("Talk", systemImage: "bubble.left.and.bubble.right") }
+                .tag(0)
             InterviewView()
                 .tabItem { Label("Ask me", systemImage: "questionmark.circle") }
+                .tag(1)
             ObserveView()
                 .tabItem { Label("Look", systemImage: "eye") }
+                .tag(2)
             MemoriesView()
                 .tabItem { Label("Corpus", systemImage: "books.vertical") }
+                .tag(3)
             SettingsView()
                 .tabItem { Label("Settings", systemImage: "gearshape") }
+                .tag(4)
         }
         .background(Theme.bg)
+        .onAppear {
+            // A newly woken avatar goes straight to its first question.
+            if store.justWoke { tab = 1 }
+        }
     }
 }

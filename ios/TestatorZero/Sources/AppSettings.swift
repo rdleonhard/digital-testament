@@ -15,6 +15,12 @@ final class AppSettings: ObservableObject {
     @Published var autoTwilight: Bool {
         didSet { UserDefaults.standard.set(autoTwilight, forKey: "auto_twilight") }
     }
+    @Published var dailyRitual: Bool {
+        didSet { UserDefaults.standard.set(dailyRitual, forKey: "daily_ritual") }
+    }
+    @Published var ritualHour: Int {
+        didSet { UserDefaults.standard.set(ritualHour, forKey: "ritual_hour") }
+    }
     var lastTwilight: Date? {
         get { UserDefaults.standard.object(forKey: "last_twilight") as? Date }
         set { UserDefaults.standard.set(newValue, forKey: "last_twilight") }
@@ -26,6 +32,8 @@ final class AppSettings: ObservableObject {
         customKey = UserDefaults.standard.string(forKey: Self.keyDefault) ?? ""
         speakReplies = UserDefaults.standard.object(forKey: "speak_replies") as? Bool ?? true
         autoTwilight = UserDefaults.standard.object(forKey: "auto_twilight") as? Bool ?? true
+        dailyRitual = UserDefaults.standard.object(forKey: "daily_ritual") as? Bool ?? false
+        ritualHour = UserDefaults.standard.object(forKey: "ritual_hour") as? Int ?? 9
     }
 
     var usingOwnKey: Bool {

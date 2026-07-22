@@ -86,6 +86,32 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle("Daily ritual", isOn: $settings.dailyRitual)
+                        .tint(Theme.gold)
+                        .onChange(of: settings.dailyRitual) { _, on in
+                            Task {
+                                if on, await NotificationManager.requestAuth() {
+                                    refreshRitual()
+                                } else if !on {
+                                    NotificationManager.cancel()
+                                }
+                            }
+                        }
+                    if settings.dailyRitual {
+                        Picker("At", selection: $settings.ritualHour) {
+                            ForEach(5 ..< 23, id: \.self) { h in
+                                Text(String(format: "%d:00", h)).tag(h)
+                            }
+                        }
+                        .onChange(of: settings.ritualHour) { refreshRitual() }
+                    }
+                } header: {
+                    Text("The daily ritual")
+                } footer: {
+                    Text("Once a day, your avatar reaches out — with a question it banked at twilight when it has one. One memory a day tends the flame.")
+                }
+
+                Section {
                     Toggle("Speak replies aloud", isOn: $settings.speakReplies)
                         .tint(Theme.gold)
                     HStack {
@@ -106,6 +132,15 @@ struct SettingsView: View {
             .sheet(isPresented: $showPaywall) { PaywallView() }
             .onAppear { voice.requestPermissions() }
         }
+    }
+
+    private func refreshRitual() {
+        guard settings.dailyRitual else { return }
+        let name = store.corpus?.identity.preferred_name ?? "Your avatar"
+        NotificationManager.scheduleDaily(
+            hour: settings.ritualHour,
+            question: store.corpus?.pending.first?.question,
+            name: name)
     }
 
     private func runTwilight() async {

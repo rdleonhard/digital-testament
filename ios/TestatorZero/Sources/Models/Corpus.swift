@@ -57,6 +57,8 @@ struct Corpus: Codable {
 final class CorpusStore: ObservableObject {
     @Published var corpus: Corpus?
     @Published var mood: String = "curious"
+    @Published var streak: Int = UserDefaults.standard.integer(forKey: "vigil_streak")
+    @Published var justWoke = false
 
     static let moods = ["curious", "cheerful", "pensive", "wistful", "alert"]
     private let grownTags: Set<String> = ["interview", "observation", "reflection"]
@@ -80,6 +82,23 @@ final class CorpusStore: ObservableObject {
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
         try? enc.encode(c).write(to: url, options: .atomic)
+    }
+
+    // The vigil streak: consecutive days the corpus was fed.
+    private func bumpStreak() {
+        let d = UserDefaults.standard
+        let day = Calendar.current.startOfDay(for: Date())
+        let last = d.object(forKey: "vigil_last") as? Date
+        if let last, Calendar.current.isDate(last, inSameDayAs: day) { return }
+        if let last,
+           let next = Calendar.current.date(byAdding: .day, value: 1, to: last),
+           Calendar.current.isDate(next, inSameDayAs: day) {
+            streak += 1
+        } else {
+            streak = 1
+        }
+        d.set(day, forKey: "vigil_last")
+        d.set(streak, forKey: "vigil_streak")
     }
 
     func begin(name: String, firstMemory: String) {
@@ -111,6 +130,8 @@ final class CorpusStore: ObservableObject {
                 : answer,
             tags: [tag], year: nil))
         save()
+        bumpStreak()
+        Haptics.success()
     }
 
     // A memory the subject simply writes down — no question, no camera.
@@ -122,6 +143,8 @@ final class CorpusStore: ObservableObject {
             narrative: narrative.trimmingCharacters(in: .whitespacesAndNewlines),
             tags: ["memory"], year: nil))
         save()
+        bumpStreak()
+        Haptics.success()
     }
 
     func deleteMemory(_ memory: Memory) {
@@ -135,6 +158,7 @@ final class CorpusStore: ObservableObject {
             title: String(title.prefix(90)), narrative: narrative,
             tags: ["reflection"], year: nil))
         save()
+        bumpStreak()
     }
 
     func addPending(question: String, mood: String) {

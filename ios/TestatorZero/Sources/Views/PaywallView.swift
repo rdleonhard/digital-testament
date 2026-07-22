@@ -7,9 +7,7 @@ struct PaywallView: View {
     var body: some View {
         VStack(spacing: 20) {
             Spacer()
-            Image(systemName: "infinity")
-                .font(.system(size: 44))
-                .foregroundStyle(Theme.gold)
+            FlameView(mood: "cheerful", size: 52)
             Text("Remembrance")
                 .font(.title.weight(.semibold))
                 .foregroundStyle(Theme.ink)
@@ -23,8 +21,17 @@ struct PaywallView: View {
                     Task { await subs.purchase(product) }
                 } label: {
                     HStack {
-                        VStack(alignment: .leading) {
-                            Text(product.displayName).font(.headline)
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 8) {
+                                Text(product.displayName).font(.headline)
+                                if product.id == SubscriptionManager.yearlyID {
+                                    Text("2 months free")
+                                        .font(.caption2.weight(.semibold))
+                                        .padding(.horizontal, 8).padding(.vertical, 3)
+                                        .background(Theme.gold.opacity(0.2), in: Capsule())
+                                        .foregroundStyle(Theme.gold)
+                                }
+                            }
                             Text(product.description)
                                 .font(.caption).foregroundStyle(Theme.dim)
                         }

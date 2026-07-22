@@ -91,6 +91,12 @@ struct InterviewView: View {
         .onChange(of: voice.transcript) {
             if voice.listening, voice.context == "interview" { answer = voice.transcript }
         }
+        .onAppear {
+            if store.justWoke {
+                store.justWoke = false
+                Task { await ask() }
+            }
+        }
     }
 
     private func ask() async {

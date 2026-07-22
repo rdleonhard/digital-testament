@@ -42,30 +42,39 @@ struct ChatView: View {
                 .onChange(of: bubbles.count) {
                     if let last = bubbles.last { proxy.scrollTo(last.id, anchor: .bottom) }
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
             inputBar
         }
         .background(Theme.bg)
+        .onAppear {
+            if bubbles.isEmpty, let c = store.corpus {
+                let n = c.identity.preferred_name ?? c.identity.full_name
+                bubbles.append(Bubble(
+                    text: "\(n) is awake — \(c.memories.count) memories aboard. Ask me about my life, or tell me something I don't know yet.",
+                    mine: false))
+            }
+        }
         .onChange(of: voice.transcript) {
             if voice.listening, voice.context == "chat" { draft = voice.transcript }
         }
     }
 
     private var header: some View {
-        HStack {
+        HStack(spacing: 10) {
+            FlameView(mood: store.mood, size: 20)
             Text((store.corpus?.identity.preferred_name ?? "avatar").uppercased())
                 .font(.system(.subheadline, design: .monospaced))
                 .kerning(2)
                 .foregroundStyle(Theme.gold)
             Spacer()
-            Circle().fill(Theme.moodColor(store.mood)).frame(width: 9, height: 9)
             Text(store.mood).font(.caption).foregroundStyle(Theme.dim)
             if voice.speaking {
                 Image(systemName: "speaker.wave.2.fill")
                     .font(.caption).foregroundStyle(Theme.gold)
             }
         }
-        .padding(.horizontal, 16).padding(.vertical, 10)
+        .padding(.horizontal, 16).padding(.vertical, 8)
         .background(Theme.panel)
     }
 

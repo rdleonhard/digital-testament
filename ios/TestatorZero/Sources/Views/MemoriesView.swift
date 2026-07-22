@@ -21,16 +21,52 @@ struct MemoriesView: View {
         return url
     }
 
+    private var stats: (words: Int, kinds: [(String, Int)]) {
+        let mems = store.corpus?.memories ?? []
+        let words = mems.reduce(0) { $0 + $1.narrative.split(separator: " ").count }
+        var counts: [String: Int] = [:]
+        for m in mems { for t in m.tags { counts[t, default: 0] += 1 } }
+        return (words, counts.sorted { $0.value > $1.value })
+    }
+
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    HStack(spacing: 14) {
+                        FlameView(mood: store.mood, size: 34)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(store.streak > 1 ? "\(store.streak)-day vigil" : "The vigil begins")
+                                .font(.headline).foregroundStyle(Theme.gold)
+                            Text("\(store.corpus?.memories.count ?? 0) memories · \(stats.words.formatted()) words of a life")
+                                .font(.caption).foregroundStyle(Theme.dim)
+                            Text(stats.kinds.prefix(4)
+                                    .map { "\($0.1) \($0.0)" }.joined(separator: " · "))
+                                .font(.caption2).foregroundStyle(Theme.dim)
+                        }
+                        Spacer()
+                    }
+                    .padding(.vertical, 4)
+                    .listRowBackground(Theme.panel)
+                }
                 Section {
                     ForEach((store.corpus?.memories ?? []).reversed()) { m in
                         MemoryRow(memory: m, expanded: expanded.contains(m.id))
                             .contentShape(Rectangle())
                             .onTapGesture {
+                                Haptics.tap()
                                 if expanded.contains(m.id) { expanded.remove(m.id) }
                                 else { expanded.insert(m.id) }
+                            }
+                            .contextMenu {
+                                if let img = MemoryCard.render(memory: m,
+                                        name: store.corpus?.identity.preferred_name ?? "") {
+                                    ShareLink(item: Image(uiImage: img),
+                                              preview: SharePreview(m.title,
+                                                                    image: Image(uiImage: img))) {
+                                        Label("Share as card", systemImage: "square.and.arrow.up")
+                                    }
+                                }
                             }
                             .listRowBackground(Theme.panel)
                     }
@@ -39,7 +75,7 @@ struct MemoriesView: View {
                         for i in idxs { store.deleteMemory(shown[i]) }
                     }
                 } header: {
-                    Text("\(store.corpus?.memories.count ?? 0) memories · \(store.corpus?.pending.count ?? 0) questions waiting")
+                    Text("\(store.corpus?.pending.count ?? 0) questions waiting · long-press to share")
                         .foregroundStyle(Theme.dim)
                 } footer: {
                     Text("Tap a memory to read it in full, swipe to delete. Your corpus is yours — export it any time; it's the same Digital Corpus the Testament Network deploys to self-hosted nodes, agent runtimes, and, one day, the device your will hands to your executor.")
