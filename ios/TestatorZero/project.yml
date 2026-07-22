@@ -9,6 +9,7 @@ targets:
     platform: iOS
     sources:
       - Sources
+      - Assets.xcassets
       - path: Secrets.plist
         optional: true
         buildPhase: resources
