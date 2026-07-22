@@ -31,8 +31,34 @@ enum NotificationManager {
                                          trigger: trigger))
     }
 
+    // Schedule the next N days, one pre-formulated "text" per day, each a
+    // distinct nudge — so it reads like your avatar messaging you, not a
+    // repeating reminder.
+    static func scheduleNudges(_ nudges: [String], hour: Int, name: String) {
+        let center = UNUserNotificationCenter.current()
+        let ids = (0 ..< 14).map { "\(id)-\($0)" } + [id]
+        center.removePendingNotificationRequests(withIdentifiers: ids)
+        let cal = Calendar.current
+        guard var fire = cal.nextDate(
+            after: Date(), matching: DateComponents(hour: hour, minute: 0),
+            matchingPolicy: .nextTime) else { return }
+        for (i, text) in nudges.prefix(7).enumerated() {
+            let content = UNMutableNotificationContent()
+            content.title = name
+            content.body = text
+            content.sound = .default
+            let comps = cal.dateComponents([.year, .month, .day, .hour, .minute],
+                                           from: fire)
+            let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+            center.add(UNNotificationRequest(identifier: "\(id)-\(i)",
+                                             content: content, trigger: trigger))
+            fire = cal.date(byAdding: .day, value: 1, to: fire) ?? fire
+        }
+    }
+
     static func cancel() {
+        let ids = (0 ..< 14).map { "\(id)-\($0)" } + [id]
         UNUserNotificationCenter.current()
-            .removePendingNotificationRequests(withIdentifiers: [id])
+            .removePendingNotificationRequests(withIdentifiers: ids)
     }
 }

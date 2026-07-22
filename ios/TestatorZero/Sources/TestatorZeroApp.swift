@@ -51,13 +51,9 @@ struct TestatorZeroApp: App {
     // and there's Diem to spend on the user's own key, reflect quietly.
     // (iOS can't guarantee a timed background wake, so we seize the open.)
     private func maybeTwilight() async {
-        // keep the daily ritual notification fresh with the latest banked question
-        if settings.dailyRitual, let c = store.corpus {
-            NotificationManager.scheduleDaily(
-                hour: settings.ritualHour,
-                question: c.pending.first?.question,
-                name: c.identity.preferred_name ?? c.identity.full_name)
-        }
+        // Formulate & schedule the avatar's "texts" for the days ahead.
+        await NudgeEngine.maybeRefill(store: store, settings: settings,
+                                      subscribed: subs.subscribed)
         guard settings.autoTwilight, settings.usingOwnKey, store.corpus != nil else { return }
         if let last = settings.lastTwilight, Date().timeIntervalSince(last) < 3600 { return }
         guard let key = VeniceClient.activeKey(customKey: settings.customKey,
@@ -96,8 +92,8 @@ struct MainTabView: View {
             InterviewView()
                 .tabItem { Label("Ask me", systemImage: "questionmark.circle") }
                 .tag(1)
-            ObserveView()
-                .tabItem { Label("Look", systemImage: "eye") }
+            AddView()
+                .tabItem { Label("Write", systemImage: "square.and.pencil") }
                 .tag(2)
             MemoriesView()
                 .tabItem { Label("Corpus", systemImage: "books.vertical") }

@@ -129,6 +129,35 @@ megabytes); wallet = secp256k1 on-device (+ATECC-class secure element);
 activation dock optional theater. Sold with the model will clause as a
 practice package: the clause names the Key; the Key executes the clause.
 
+## The Compilation (death-time character synthesis)
+
+The corpus is gathered slowly, in life — a memory a day, observations,
+twilight reflections — precisely so that at the end there is enough
+*evidence* to compile an honest character, not a flattering one. At the
+upload (the Digital Executor's act, alongside plugging in the Testament
+Key), an AI pass reads the whole accumulated corpus and synthesizes the
+final ElizaOS character file:
+
+- **Objective trait classification.** Personality traits are inferred
+  from the *pattern of the corpus* — recurring themes, what the person
+  actually did and dwelt on — not from self-description. A subject who
+  narrates themselves as cheerful but whose memories are steeped in loss
+  is classified by the evidence: the character reads *wistful*, because
+  everyone but the subject could always see it. Self-perception is the
+  least reliable witness; the corpus is a truer one. This is the whole
+  reason to collect slowly over years rather than ask "describe
+  yourself" once.
+- **Output**: `bio`, `lore`, `knowledge`, `messageExamples`, `topics`,
+  `adjectives`, and `style` — a richer synthesis than the mechanical
+  `tomb eliza` mapping, which becomes the fast path; the Compilation is
+  the considered one, run once, at the end.
+- **Executor review**: the compiled traits are surfaced to the Digital
+  Executor before the persona goes live — a human confirms the machine's
+  reading of a life (mirrors the §5(g) advise → veto → default pattern).
+
+Status: designed here; `tomb eliza` (mechanical) ships today. The
+trait-inference Compilation is a roadmap build.
+
 ## The demand loop
 
 ```

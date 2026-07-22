@@ -14,6 +14,8 @@ struct ChatView: View {
     @State private var bubbles: [Bubble] = []
     @State private var draft = ""
     @State private var busy = false
+    @State private var showHome = false
+    @FocusState private var focused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -43,8 +45,13 @@ struct ChatView: View {
                     if let last = bubbles.last { proxy.scrollTo(last.id, anchor: .bottom) }
                 }
                 .scrollDismissesKeyboard(.interactively)
+                .contentShape(Rectangle())
+                .onTapGesture { focused = false; hideKeyboard() }
             }
             inputBar
+        }
+        .sheet(isPresented: $showHome) {
+            AvatarHomeView().presentationDragIndicator(.hidden)
         }
         .background(Theme.bg)
         .onAppear {
@@ -61,21 +68,30 @@ struct ChatView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 10) {
-            FlameView(mood: store.mood, size: 20)
-            Text((store.corpus?.identity.preferred_name ?? "avatar").uppercased())
-                .font(.system(.subheadline, design: .monospaced))
-                .kerning(2)
-                .foregroundStyle(Theme.gold)
-            Spacer()
-            Text(store.mood).font(.caption).foregroundStyle(Theme.dim)
-            if voice.speaking {
-                Image(systemName: "speaker.wave.2.fill")
-                    .font(.caption).foregroundStyle(Theme.gold)
+        Button {
+            focused = false; hideKeyboard()
+            Haptics.tap()
+            showHome = true
+        } label: {
+            HStack(spacing: 10) {
+                FlameView(mood: store.mood, size: 20)
+                Text((store.corpus?.identity.preferred_name ?? "avatar").uppercased())
+                    .font(.system(.subheadline, design: .monospaced))
+                    .kerning(2)
+                    .foregroundStyle(Theme.gold)
+                Image(systemName: "chevron.down").font(.caption2).foregroundStyle(Theme.dim)
+                Spacer()
+                Text(store.mood).font(.caption).foregroundStyle(Theme.dim)
+                if voice.speaking {
+                    Image(systemName: "speaker.wave.2.fill")
+                        .font(.caption).foregroundStyle(Theme.gold)
+                }
             }
+            .contentShape(Rectangle())
+            .padding(.horizontal, 16).padding(.vertical, 8)
+            .background(Theme.panel)
         }
-        .padding(.horizontal, 16).padding(.vertical, 8)
-        .background(Theme.panel)
+        .buttonStyle(.plain)
     }
 
     private var inputBar: some View {
@@ -83,6 +99,7 @@ struct ChatView: View {
             TextField("say something…", text: $draft, axis: .vertical)
                 .lineLimit(1 ... 3)
                 .textFieldStyle(.plain)
+                .focused($focused)
                 .padding(10)
                 .background(Theme.panel, in: RoundedRectangle(cornerRadius: 10))
                 .foregroundStyle(Theme.ink)

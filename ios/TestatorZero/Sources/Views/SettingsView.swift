@@ -136,11 +136,13 @@ struct SettingsView: View {
 
     private func refreshRitual() {
         guard settings.dailyRitual else { return }
-        let name = store.corpus?.identity.preferred_name ?? "Your avatar"
-        NotificationManager.scheduleDaily(
-            hour: settings.ritualHour,
-            question: store.corpus?.pending.first?.question,
-            name: name)
+        Task {
+            await NudgeEngine.maybeRefill(store: store, settings: settings,
+                                          subscribed: subs.subscribed)
+            NudgeEngine.reschedule(
+                settings: settings,
+                name: store.corpus?.identity.preferred_name ?? "Your avatar")
+        }
     }
 
     private func runTwilight() async {
