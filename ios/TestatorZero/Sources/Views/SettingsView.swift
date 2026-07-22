@@ -5,7 +5,10 @@ struct SettingsView: View {
     @EnvironmentObject var settings: AppSettings
     @EnvironmentObject var subs: SubscriptionManager
     @EnvironmentObject var voice: VoiceManager
+    @EnvironmentObject var store: CorpusStore
     @State private var showPaywall = false
+    @State private var twilightRunning = false
+    @State private var twilightLog = ""
 
     private var status: String {
         if settings.usingOwnKey { return "Using your own Venice key — free, unlimited." }
@@ -55,6 +58,34 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    if settings.usingOwnKey {
+                        Toggle("Reflect near each epoch's end", isOn: $settings.autoTwilight)
+                            .tint(Theme.gold)
+                        Button {
+                            Task { await runTwilight() }
+                        } label: {
+                            HStack {
+                                Label(twilightRunning ? "reflecting…" : "Reflect now",
+                                      systemImage: "moon.stars")
+                                if twilightRunning { Spacer(); ProgressView().tint(Theme.gold) }
+                            }
+                        }
+                        .disabled(twilightRunning)
+                        .foregroundStyle(Theme.gold)
+                        if !twilightLog.isEmpty {
+                            Text(twilightLog).font(.caption).foregroundStyle(Theme.dim)
+                        }
+                    } else {
+                        Text("Twilight reflections run on your own Venice key — add one above to let your avatar spend its expiring daily allocation on thinking about itself.")
+                            .font(.footnote).foregroundStyle(Theme.dim)
+                    }
+                } header: {
+                    Text("Twilight")
+                } footer: {
+                    Text("Diem doesn't roll over. As the daily epoch closes, your avatar spends what's left on reflections, memory-weaves, and questions it banks for you — an impression that accretes, epoch after epoch.")
+                }
+
+                Section {
                     Toggle("Speak replies aloud", isOn: $settings.speakReplies)
                         .tint(Theme.gold)
                     HStack {
@@ -75,5 +106,19 @@ struct SettingsView: View {
             .sheet(isPresented: $showPaywall) { PaywallView() }
             .onAppear { voice.requestPermissions() }
         }
+    }
+
+    private func runTwilight() async {
+        guard let key = VeniceClient.activeKey(customKey: settings.customKey,
+                                               subscribed: subs.subscribed),
+              settings.usingOwnKey else { return }
+        twilightRunning = true
+        twilightLog = "reading the epoch…"
+        let s = await TwilightEngine.run(store: store, key: key) { line in
+            twilightLog = line
+        }
+        settings.lastTwilight = Date()
+        twilightRunning = false
+        twilightLog = "Spent \(String(format: "%.2f", s.startedDiem - s.endedDiem)) Diem: \(s.reflections) reflections, \(s.wondered) questions banked."
     }
 }

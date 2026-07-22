@@ -129,6 +129,22 @@ final class CorpusStore: ObservableObject {
         save()
     }
 
+    func addReflection(title: String, narrative: String) {
+        guard corpus != nil else { return }
+        corpus!.memories.append(Memory(
+            title: String(title.prefix(90)), narrative: narrative,
+            tags: ["reflection"], year: nil))
+        save()
+    }
+
+    func addPending(question: String, mood: String) {
+        guard corpus != nil else { return }
+        corpus!.pending.append(PendingQuestion(question: question, mood: mood))
+        save()
+    }
+
+    var pendingCount: Int { corpus?.pending.count ?? 0 }
+
     func popPending() -> PendingQuestion? {
         guard corpus != nil, !corpus!.pending.isEmpty else { return nil }
         let q = corpus!.pending.removeFirst()

@@ -65,6 +65,24 @@ struct VeniceClient {
         return (msg?["content"] as? String) ?? ""
     }
 
+    // Remaining daily Diem and when the epoch turns (for twilight).
+    static func diemBalance(key: String) async throws -> (diem: Double, epoch: String) {
+        var req = URLRequest(url: URL(string: "https://api.venice.ai/api/v1/api_keys/rate_limits")!)
+        req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        req.timeoutInterval = 30
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        guard code == 200 else {
+            throw VeniceError.badResponse(code, String(data: data, encoding: .utf8) ?? "")
+        }
+        let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let d = obj?["data"] as? [String: Any]
+        let balances = d?["balances"] as? [String: Any]
+        let diem = (balances?["DIEM"] as? Double) ?? 0
+        let epoch = (d?["nextEpochBegins"] as? String) ?? ""
+        return (diem, epoch)
+    }
+
     static func describe(image: UIImage, systemPrompt: String,
                          key: String) async throws -> String {
         let jpeg = image.jpegData(compressionQuality: 0.7) ?? Data()

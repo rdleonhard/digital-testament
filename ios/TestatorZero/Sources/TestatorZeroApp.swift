@@ -30,6 +30,7 @@ struct TestatorZeroApp: App {
     @StateObject private var subs = SubscriptionManager()
     @StateObject private var voice = VoiceManager()
     @StateObject private var settings = AppSettings()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -40,7 +41,24 @@ struct TestatorZeroApp: App {
                 .environmentObject(settings)
                 .preferredColorScheme(.dark)
                 .tint(Theme.gold)
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .active { Task { await maybeTwilight() } }
+                }
         }
+    }
+
+    // Opportunistic twilight: on app open, if the epoch is nearly over
+    // and there's Diem to spend on the user's own key, reflect quietly.
+    // (iOS can't guarantee a timed background wake, so we seize the open.)
+    private func maybeTwilight() async {
+        guard settings.autoTwilight, settings.usingOwnKey, store.corpus != nil else { return }
+        if let last = settings.lastTwilight, Date().timeIntervalSince(last) < 3600 { return }
+        guard let key = VeniceClient.activeKey(customKey: settings.customKey,
+                                               subscribed: subs.subscribed) else { return }
+        guard let (diem, epoch) = try? await VeniceClient.diemBalance(key: key),
+              TwilightEngine.shouldAutoRun(diem: diem, epoch: epoch) else { return }
+        settings.lastTwilight = Date()
+        _ = await TwilightEngine.run(store: store, key: key)
     }
 }
 
