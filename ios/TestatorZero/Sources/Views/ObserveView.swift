@@ -10,6 +10,8 @@ import UIKit
 struct ObserveView: View {
     @EnvironmentObject var store: CorpusStore
     @EnvironmentObject var voice: VoiceManager
+    @EnvironmentObject var settings: AppSettings
+    @EnvironmentObject var subs: SubscriptionManager
     @State private var showCamera = false
     @State private var pickerItem: PhotosPickerItem?
     @State private var busy = false
@@ -95,18 +97,23 @@ struct ObserveView: View {
     }
 
     private func observe(_ image: UIImage) async {
+        guard let key = VeniceClient.activeKey(customKey: settings.customKey,
+                                               subscribed: subs.subscribed) else {
+            lastObservation = VeniceError.needsEntitlement.localizedDescription
+            return
+        }
         busy = true
         defer { busy = false }
         do {
             let reply = try await VeniceClient.describe(
-                image: image, systemPrompt: store.systemPrompt())
+                image: image, systemPrompt: store.systemPrompt(), key: key)
             let (text, mood) = CorpusStore.parseTags(reply)
             store.mood = mood
             lastObservation = text
             let stamp = Date().formatted(date: .abbreviated, time: .shortened)
             store.addMemory(question: "Through my eye, \(stamp)",
                             answer: text, tag: "observation")
-            voice.speak(text)
+            if settings.speakReplies { voice.speak(text) }
         } catch {
             lastObservation = "(\(error.localizedDescription))"
         }

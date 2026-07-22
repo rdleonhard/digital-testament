@@ -17,6 +17,9 @@ final class VoiceManager: NSObject, ObservableObject {
     @Published var listening = false
     @Published var speaking = false
     @Published var personalVoiceReady = false
+    // Which screen owns the current dictation, so one tab's speech never
+    // leaks into another's text field (they share this one manager).
+    @Published var context = ""
 
     private let synth = AVSpeechSynthesizer()
     private let recognizer = SFSpeechRecognizer()
@@ -43,8 +46,9 @@ final class VoiceManager: NSObject, ObservableObject {
 
     // MARK: ears
 
-    func startListening() throws {
+    func startListening(context: String = "") throws {
         stopSpeaking()
+        self.context = context
         transcript = ""
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.record, mode: .measurement, options: .duckOthers)

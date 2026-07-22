@@ -6,11 +6,11 @@ import UIKit
 // it reads Secrets.plist (gitignored).
 
 enum VeniceError: LocalizedError {
-    case noKey, badResponse(Int, String)
+    case needsEntitlement, badResponse(Int, String)
     var errorDescription: String? {
         switch self {
-        case .noKey:
-            return "No Venice API key. Add Secrets.plist (see Secrets.example.plist)."
+        case .needsEntitlement:
+            return "Add your own Venice key in Settings (free), or subscribe to use our inference."
         case let .badResponse(code, body):
             return "Venice \(code): \(body.prefix(140))"
         }
@@ -22,17 +22,30 @@ struct VeniceClient {
     static let visionModel = "qwen3-vl-235b-a22b"
     private static let endpoint = URL(string: "https://api.venice.ai/api/v1/chat/completions")!
 
-    static var apiKey: String? {
-        guard let url = Bundle.main.url(forResource: "Secrets", withExtension: "plist"),
-              let dict = NSDictionary(contentsOf: url),
-              let key = dict["VENICE_API_KEY"] as? String, !key.isEmpty
-        else { return nil }
-        return key
+    // Our default (bundled) key — the paid convenience, subscription-gated.
+    static var bundledKey: String? {
+        let docs = FileManager.default.urls(for: .documentDirectory,
+                                            in: .userDomainMask).first?
+            .appendingPathComponent("Secrets.plist")
+        for url in [docs, Bundle.main.url(forResource: "Secrets", withExtension: "plist")].compactMap({ $0 }) {
+            if let dict = NSDictionary(contentsOf: url),
+               let key = dict["VENICE_API_KEY"] as? String, !key.isEmpty {
+                return key
+            }
+        }
+        return nil
     }
 
-    static func chat(messages: [[String: Any]], model: String = chatModel,
+    // The app is free with your own key; our key needs a subscription.
+    static func activeKey(customKey: String, subscribed: Bool) -> String? {
+        let own = customKey.trimmingCharacters(in: .whitespaces)
+        if !own.isEmpty { return own }
+        return subscribed ? bundledKey : nil
+    }
+
+    static func chat(messages: [[String: Any]], key: String,
+                     model: String = chatModel,
                      maxTokens: Int = 400) async throws -> String {
-        guard let key = apiKey else { throw VeniceError.noKey }
         var req = URLRequest(url: endpoint)
         req.httpMethod = "POST"
         req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
@@ -52,16 +65,17 @@ struct VeniceClient {
         return (msg?["content"] as? String) ?? ""
     }
 
-    static func describe(image: UIImage, systemPrompt: String) async throws -> String {
+    static func describe(image: UIImage, systemPrompt: String,
+                         key: String) async throws -> String {
         let jpeg = image.jpegData(compressionQuality: 0.7) ?? Data()
         let dataURL = "data:image/jpeg;base64," + jpeg.base64EncodedString()
-        let ask = "You just looked through your subject's camera. Describe in first person, in your own voice, what you see and what it suggests about the life you are learning. 2-4 sentences, warm and specific. This is a private diary entry — skip your disclosure line. Then the [mood: X] line."
+        let ask = "You just looked through your subject's camera. Describe in first person, in your own voice, what you see and what it suggests about the life you are learning. 2-4 sentences, warm and specific. This is a private diary entry. Then the [mood: X] line."
         return try await chat(messages: [
             ["role": "system", "content": systemPrompt],
             ["role": "user", "content": [
                 ["type": "text", "text": ask],
                 ["type": "image_url", "image_url": ["url": dataURL]],
             ]],
-        ], model: visionModel)
+        ], key: key, model: visionModel)
     }
 }

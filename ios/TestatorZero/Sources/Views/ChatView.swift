@@ -9,6 +9,8 @@ struct Bubble: Identifiable {
 struct ChatView: View {
     @EnvironmentObject var store: CorpusStore
     @EnvironmentObject var voice: VoiceManager
+    @EnvironmentObject var settings: AppSettings
+    @EnvironmentObject var subs: SubscriptionManager
     @State private var bubbles: [Bubble] = []
     @State private var draft = ""
     @State private var busy = false
@@ -45,7 +47,7 @@ struct ChatView: View {
         }
         .background(Theme.bg)
         .onChange(of: voice.transcript) {
-            if voice.listening { draft = voice.transcript }
+            if voice.listening, voice.context == "chat" { draft = voice.transcript }
         }
     }
 
@@ -79,12 +81,12 @@ struct ChatView: View {
                 if voice.listening {
                     voice.stopListening()
                 } else {
-                    try? voice.startListening()
+                    try? voice.startListening(context: "chat")
                 }
             } label: {
-                Image(systemName: voice.listening ? "mic.fill" : "mic")
+                Image(systemName: voice.listening && voice.context == "chat" ? "mic.fill" : "mic")
                     .font(.title3)
-                    .foregroundStyle(voice.listening ? .red : Theme.gold)
+                    .foregroundStyle(voice.listening && voice.context == "chat" ? .red : Theme.gold)
             }
             Button { Task { await send() } } label: {
                 Image(systemName: "arrow.up.circle.fill").font(.title2)
@@ -99,6 +101,11 @@ struct ChatView: View {
         if voice.listening { voice.stopListening() }
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+        guard let key = VeniceClient.activeKey(customKey: settings.customKey,
+                                               subscribed: subs.subscribed) else {
+            bubbles.append(Bubble(text: VeniceError.needsEntitlement.localizedDescription, mine: false))
+            return
+        }
         draft = ""
         bubbles.append(Bubble(text: text, mine: true))
         busy = true
@@ -107,11 +114,11 @@ struct ChatView: View {
             let reply = try await VeniceClient.chat(messages: [
                 ["role": "system", "content": store.systemPrompt()],
                 ["role": "user", "content": text],
-            ])
+            ], key: key)
             let (clean, mood) = CorpusStore.parseTags(reply)
             store.mood = mood
             bubbles.append(Bubble(text: clean, mine: false))
-            voice.speak(clean)
+            if settings.speakReplies { voice.speak(clean) }
         } catch {
             bubbles.append(Bubble(text: "(\(error.localizedDescription))", mine: false))
         }

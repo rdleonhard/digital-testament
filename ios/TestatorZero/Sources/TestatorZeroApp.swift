@@ -29,6 +29,7 @@ struct TestatorZeroApp: App {
     @StateObject private var store = CorpusStore()
     @StateObject private var subs = SubscriptionManager()
     @StateObject private var voice = VoiceManager()
+    @StateObject private var settings = AppSettings()
 
     var body: some Scene {
         WindowGroup {
@@ -36,6 +37,7 @@ struct TestatorZeroApp: App {
                 .environmentObject(store)
                 .environmentObject(subs)
                 .environmentObject(voice)
+                .environmentObject(settings)
                 .preferredColorScheme(.dark)
                 .tint(Theme.gold)
         }
@@ -44,16 +46,13 @@ struct TestatorZeroApp: App {
 
 struct RootView: View {
     @EnvironmentObject var store: CorpusStore
-    @EnvironmentObject var subs: SubscriptionManager
 
     var body: some View {
         Group {
             if store.corpus == nil {
                 OnboardingView()
-            } else if !subs.subscribed {
-                PaywallView()
             } else {
-                MainTabView()
+                MainTabView() // free to enter; inference gated per-call
             }
         }
         .background(Theme.bg)
@@ -71,6 +70,8 @@ struct MainTabView: View {
                 .tabItem { Label("Look", systemImage: "eye") }
             MemoriesView()
                 .tabItem { Label("Corpus", systemImage: "books.vertical") }
+            SettingsView()
+                .tabItem { Label("Settings", systemImage: "gearshape") }
         }
         .background(Theme.bg)
     }

@@ -7,6 +7,8 @@ import SwiftUI
 struct InterviewView: View {
     @EnvironmentObject var store: CorpusStore
     @EnvironmentObject var voice: VoiceManager
+    @EnvironmentObject var settings: AppSettings
+    @EnvironmentObject var subs: SubscriptionManager
     @State private var question: String?
     @State private var answer = ""
     @State private var busy = false
@@ -48,11 +50,12 @@ struct InterviewView: View {
                 HStack(spacing: 16) {
                     Button {
                         if voice.listening { voice.stopListening() }
-                        else { try? voice.startListening() }
+                        else { try? voice.startListening(context: "interview") }
                     } label: {
-                        Label(voice.listening ? "listening…" : "speak",
-                              systemImage: voice.listening ? "mic.fill" : "mic")
-                            .foregroundStyle(voice.listening ? .red : Theme.gold)
+                        let on = voice.listening && voice.context == "interview"
+                        Label(on ? "listening…" : "speak",
+                              systemImage: on ? "mic.fill" : "mic")
+                            .foregroundStyle(on ? .red : Theme.gold)
                     }
                     Button("Commit memory") { commit(q) }
                         .buttonStyle(.borderedProminent)
@@ -86,7 +89,7 @@ struct InterviewView: View {
         }
         .background(Theme.bg)
         .onChange(of: voice.transcript) {
-            if voice.listening { answer = voice.transcript }
+            if voice.listening, voice.context == "interview" { answer = voice.transcript }
         }
     }
 
@@ -95,7 +98,12 @@ struct InterviewView: View {
         if let banked = store.popPending() {
             question = banked.question
             store.mood = banked.mood
-            voice.speak(banked.question)
+            if settings.speakReplies { voice.speak(banked.question) }
+            return
+        }
+        guard let key = VeniceClient.activeKey(customKey: settings.customKey,
+                                               subscribed: subs.subscribed) else {
+            question = VeniceError.needsEntitlement.localizedDescription
             return
         }
         busy = true
@@ -108,11 +116,11 @@ struct InterviewView: View {
             let reply = try await VeniceClient.chat(messages: [
                 ["role": "system", "content": store.systemPrompt()],
                 ["role": "user", "content": ask],
-            ], maxTokens: 120)
+            ], key: key, maxTokens: 120)
             let (q, mood) = CorpusStore.parseTags(reply)
             question = q
             store.mood = mood
-            voice.speak(q)
+            if settings.speakReplies { voice.speak(q) }
         } catch {
             question = nil
             committed = nil

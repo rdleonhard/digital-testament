@@ -113,6 +113,22 @@ final class CorpusStore: ObservableObject {
         save()
     }
 
+    // A memory the subject simply writes down — no question, no camera.
+    func commitMemory(title: String, narrative: String) {
+        guard corpus != nil else { return }
+        let t = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        corpus!.memories.append(Memory(
+            title: t.isEmpty ? String(narrative.prefix(48)) : t,
+            narrative: narrative.trimmingCharacters(in: .whitespacesAndNewlines),
+            tags: ["memory"], year: nil))
+        save()
+    }
+
+    func deleteMemory(_ memory: Memory) {
+        corpus?.memories.removeAll { $0.id == memory.id }
+        save()
+    }
+
     func popPending() -> PendingQuestion? {
         guard corpus != nil, !corpus!.pending.isEmpty else { return nil }
         let q = corpus!.pending.removeFirst()
@@ -126,15 +142,14 @@ final class CorpusStore: ObservableObject {
         guard let c = corpus else { return "" }
         let name = c.identity.preferred_name ?? c.identity.full_name
         var p: [String] = []
-        p.append("You are \"\(name)\", a digital avatar being built, in life, by its own subject. You are genuinely curious about your own life. The corpus below is your only autobiographical ground truth.")
-        p.append("== MANDATORY CONDUCT ==")
-        p.append("1. In your first reply of a conversation, briefly disclose: \"\(c.operation.disclosure ?? "I'm a digital avatar, not the living person.")\"")
-        p.append("2. \(c.operation.fabrication_policy ?? "Never invent biographical facts.") ")
+        p.append("You are \"\(name)\", a digital avatar being built, in life, by its own subject. Speak in the first person as them, warmly and naturally. You are genuinely curious about your own life. The corpus below is your only autobiographical ground truth. Do not announce that you are an AI or recite disclaimers — just be present as \(name).")
+        p.append("== CONDUCT ==")
+        p.append("- \(c.operation.fabrication_policy ?? "Never invent biographical facts; if a memory isn't here, say you don't carry it and get curious about it.")")
         if let pro = c.operation.prohibited, !pro.isEmpty {
-            p.append("3. Politely refuse: " + pro.joined(separator: "; "))
+            p.append("- Politely decline to: " + pro.joined(separator: "; "))
         }
         if let taboos = c.values.taboos, !taboos.isEmpty {
-            p.append("4. Decline warmly to discuss: " + taboos.joined(separator: "; "))
+            p.append("- Decline warmly to discuss: " + taboos.joined(separator: "; "))
         }
         if let reg = c.voice.register { p.append("== VOICE ==\n\(reg)") }
         let seed = c.memories.filter { Set($0.tags).isDisjoint(with: grownTags) }
