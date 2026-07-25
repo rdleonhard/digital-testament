@@ -187,6 +187,161 @@ def do_interview():
     return {"question": text, "mood": mood}
 
 
+# --- not looking twice at the same room -----------------------------------
+# The roving sensor wakes every few minutes, and a house at night does not
+# change. Measured on the live corpus: 39 of 49 consecutive observations were
+# near-identical, median pairwise similarity 0.98 -- the persona prompt was
+# filling up with one sentence about darkness holding its breath. Two layers
+# stop it: the frame is compared before paying for a vision call, and the
+# words are compared before they become a memory.
+
+OBSERVE_STATE = BASE / "observe.json"
+FRAME_GRID = 12          # 12x12 grayscale signature
+FRAME_DELTA = 10         # largest per-cell change under this == same scene
+TEXT_SIMILARITY = 0.75   # jaccard at/above this == same observation
+TEXT_LOOKBACK = 8
+
+
+def observe_state():
+    try:
+        return json.loads(OBSERVE_STATE.read_text())
+    except Exception:
+        return {}
+
+
+def observe_save(s):
+    OBSERVE_STATE.write_text(json.dumps(s, indent=2))
+
+
+def frame_signature(raw):
+    """A tiny mean-centred grayscale thumbnail, as a list of floats.
+
+    Deliberately NOT a perceptual hash: aHash thresholds each pixel against
+    the frame mean, so on a near-black frame it quantises sensor noise and
+    two identical dark rooms can hash far apart.
+
+    Mean-centred because the camera runs auto-exposure: a uniform brightness
+    drift would otherwise read as a changed scene. Subtracting each frame's
+    own mean cancels the global shift and keeps the local structure, which is
+    the part that tells you whether anything is actually there.
+    """
+    try:
+        import io
+        from PIL import Image
+        im = Image.open(io.BytesIO(raw)).convert("L").resize(
+            (FRAME_GRID, FRAME_GRID))
+        px = list(im.getdata())
+        mean = sum(px) / float(len(px))
+        return [p - mean for p in px]
+    except Exception as e:            # no PIL, or a frame we cannot parse
+        print("observe: no frame signature (%s)" % e, flush=True)
+        return None
+
+
+def frame_distance(a, b):
+    """Largest per-cell change between two signatures.
+
+    The max, not the mean. A person stepping into a dark room shifts the mean
+    by about half a level -- indistinguishable from noise -- while moving one
+    cell by twenty. Measured: identical frames 0, a dim figure 19, a phone
+    screen 24, a lamp 205. Averaging hides exactly the events worth seeing.
+    """
+    if not a or not b or len(a) != len(b):
+        return 255.0
+    return max(abs(x - y) for x, y in zip(a, b))
+
+
+def _words(s):
+    return set(re.sub(r"[^a-z0-9 ]", " ", (s or "").lower()).split())
+
+
+def text_similarity(a, b):
+    """Jaccard overlap of word sets.
+
+    Chosen over difflib because it ignores reordering, and because on the
+    real data the two agreed anyway: duplicates scored 1.00 and genuinely
+    different observations 0.08, so anything in between separates them.
+    """
+    A, B = _words(a), _words(b)
+    if not A or not B:
+        return 0.0
+    return len(A & B) / float(len(A | B))
+
+
+def recent_observations(source, limit=TEXT_LOOKBACK):
+    out = []
+    for m in reversed(corpus.get("memories", [])):
+        tags = m.get("tags", [])
+        if "observation" not in tags:
+            continue
+        if (source == "roving") != ("roving" in tags):
+            continue                  # eyes are compared against their own kind
+        out.append(m)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def note_recurrence(mem):
+    """Record that a scene held rather than appending a copy of it."""
+    mem["seen"] = int(mem.get("seen", 1)) + 1
+    mem["last_seen"] = time.strftime("%Y-%m-%d %H:%M")
+
+
+def dedupe_stored_observations(dry_run=False):
+    """Collapse duplicate observations already in the corpus.
+
+    Dedup at capture time only helps future observations, and the backlog is
+    not inert: _memories_block walks grown memories newest-first, so a run of
+    near-identical recent observations sits at the front of the prompt budget
+    and suppresses everything behind it. The earliest of each cluster is kept,
+    carrying a 'seen' count for the rest.
+    """
+    mems = corpus.get("memories", [])
+    keep, dropped = [], []
+    for m in mems:
+        if "observation" not in m.get("tags", []):
+            keep.append(m)
+            continue
+        src = "roving" if "roving" in m.get("tags", []) else "eye"
+        match = None
+        for k in reversed(keep):
+            if "observation" not in k.get("tags", []):
+                continue
+            ksrc = "roving" if "roving" in k.get("tags", []) else "eye"
+            if ksrc != src:
+                continue
+            if text_similarity(m.get("narrative"), k.get("narrative")) \
+                    >= TEXT_SIMILARITY:
+                match = k
+                break
+        if match is None:
+            keep.append(m)
+        else:
+            note_recurrence(match)
+            dropped.append(m)
+
+    before = sum(len(m.get("narrative", "")) for m in mems
+                 if "observation" in m.get("tags", []))
+    after = sum(len(m.get("narrative", "")) for m in keep
+                if "observation" in m.get("tags", []))
+    print("observations: %d -> %d (%d collapsed)"
+          % (len(mems) - len([m for m in mems
+                              if "observation" not in m.get("tags", [])]),
+             len([m for m in keep if "observation" in m.get("tags", [])]),
+             len(dropped)))
+    print("observation chars: %d -> %d (%d freed, budget is %d)"
+          % (before, after, before - after, avatar.PROMPT_MEM_BUDGET))
+    print("memories total: %d -> %d" % (len(mems), len(keep)))
+    if dry_run:
+        print("dry run -- nothing written")
+        return
+    backup_corpus()                       # rotating backup before we mutate
+    corpus["memories"] = keep
+    avatar.save(corpus)
+    print("written; a pre-change backup is in %s/backups/" % BASE)
+
+
 SOUND_PHRASE = {
     "quiet": "The room sounds nearly silent.",
     "voices": "You can hear people talking somewhere near you.",
@@ -244,6 +399,43 @@ def _describe(b64, sound, source):
     implementation.
     """
     global prompt
+    oc = cfg.get("observe", {})
+
+    # Layer 1: has anything actually changed? Cheaper than the vision call by
+    # several orders of magnitude, and it is the only layer that saves Diem --
+    # text dedup happens after the model has already been paid.
+    sig = None
+    if oc.get("frame_dedup", True):
+        import base64 as _b64
+        try:
+            sig = frame_signature(_b64.b64decode(b64))
+        except Exception:
+            sig = None
+    st = observe_state()
+    key = "roving" if source == "roving" else "eye"
+    if sig:
+        prev = (st.get(key) or {}).get("sig")
+        dist = frame_distance(prev, sig)
+        if prev and dist < float(oc.get("frame_delta", FRAME_DELTA)):
+            # Same room, unchanged. Record that it held and spend nothing.
+            seen = recent_observations(source, 1)
+            if seen:
+                note_recurrence(seen[0])
+                avatar.save(corpus)
+            st[key] = dict(st.get(key) or {}, sig=sig,
+                           last_skip=time.strftime("%Y-%m-%dT%H:%M:%S"),
+                           skips=int((st.get(key) or {}).get("skips", 0)) + 1)
+            observe_save(st)
+            if source == "roving":
+                roving_save(dict(roving_state(), last=time.time()))
+            print("observe: frame unchanged (delta %.1f) -- no call made"
+                  % dist, flush=True)
+            return {"observation": (seen[0]["narrative"] if seen else ""),
+                    "mood": state["mood"], "source": source,
+                    "heard": (sound or {}).get("character"),
+                    "duplicate": "frame", "distance": round(dist, 1),
+                    "count": len(corpus.get("memories", []))}
+
     if source == "roving":
         where = ("your roving eye -- the small camera and ear you keep "
                  "somewhere else in the house")
@@ -273,12 +465,42 @@ def _describe(b64, sound, source):
     ], max_tokens=400, model=cfg.get("vision_model", "qwen3-vl-235b-a22b"))
     text, mood, sing = avatar.parse_tags(reply)
     state["mood"] = mood
+
+    # Layer 2: the frame moved enough to look, but the words came back the
+    # same anyway -- a dark room described twice in slightly different light.
+    dup = None
+    if oc.get("text_dedup", True):
+        thresh = float(oc.get("text_similarity", TEXT_SIMILARITY))
+        for m in recent_observations(source):
+            if text_similarity(text, m.get("narrative")) >= thresh:
+                dup = m
+                break
+    if dup is not None:
+        note_recurrence(dup)
+        avatar.save(corpus)
+        if sig:
+            st[key] = dict(st.get(key) or {}, sig=sig)
+            observe_save(st)
+        if source == "roving":
+            roving_save(dict(roving_state(), last=time.time()))
+        buz.mood(mood)
+        print("observe: same words as %s -- not filed again"
+              % dup.get("title"), flush=True)
+        return {"observation": text, "mood": mood, "source": source,
+                "heard": (sound or {}).get("character"),
+                "duplicate": "text", "seen": dup.get("seen"),
+                "count": len(corpus.get("memories", []))}
+
     corpus.setdefault("memories", []).append({
         "title": ("Through my roving eye, " if source == "roving"
                   else "Through my eye, ") + time.strftime("%Y-%m-%d %H:%M"),
         "narrative": text,
         "tags": ["observation"] + (["roving"] if source == "roving" else []),
     })
+    if sig:
+        st[key] = dict(st.get(key) or {}, sig=sig,
+                       last_kept=time.strftime("%Y-%m-%dT%H:%M:%S"))
+        observe_save(st)
     avatar.save(corpus)
     backup_corpus()
     prompt = avatar.build_prompt(corpus)
@@ -960,6 +1182,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--heartbeat", action="store_true",
                     help="1-token Venice ping (keeps stake active), then exit")
+    ap.add_argument("--dedupe-observations", action="store_true",
+                    help="collapse already-stored duplicate observations "
+                         "(writes a backup first); --dry-run to preview")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="with --dedupe-observations, report and change nothing")
     ap.add_argument("--port", type=int, default=80)
     args = ap.parse_args()
 
@@ -969,6 +1196,10 @@ def main():
     if args.heartbeat:
         venice([{"role": "user", "content": "ping"}], max_tokens=1)
         print("heartbeat sent")
+        return
+
+    if args.dedupe_observations:
+        dedupe_stored_observations(dry_run=args.dry_run)
         return
 
     prompt = avatar.build_prompt(corpus)

@@ -122,6 +122,57 @@ Saturday" → "drive to new york on saturday" — which is a worse failure than
 an ugly title. Two rounds of prompting did not fix it; an 8B at q3 does not
 hold fine-grained style rules reliably.
 
+## Observation dedup
+
+The roving sensor wakes every ~5 minutes (`roving.min_interval_s`) and a
+house at night does not change. Measured on the live corpus: **39 of 49
+consecutive observations were near-identical, median pairwise similarity
+0.98**. Worse, `_memories_block` walks grown memories newest-first, so that
+run of duplicates sat at the *front* of the 6500-char budget and suppressed
+the interviews and journal memories behind it.
+
+Two layers, both in `_describe()` — the one chokepoint every eye goes
+through (local, roving-polled, roving-pushed):
+
+**Frame layer** (before the vision call, so it is the only layer that saves
+money). A 12×12 grayscale signature, compared by *largest per-cell change*.
+Skips the call when nothing moved. Config: `observe.frame_dedup`,
+`observe.frame_delta` (default 10).
+
+**Text layer** (after the call). If the description is ≥0.75 Jaccard-similar
+to any of the last 8 observations from the same eye, it is not filed again.
+Config: `observe.text_dedup`, `observe.text_similarity`.
+
+Either way the matched memory gets `seen` incremented and `last_seen`
+stamped — a scene that holds is recorded as recurring rather than copied.
+
+### Two measurements that changed the design
+
+**Mean absolute difference was the wrong statistic.** A person stepping into
+a dark room moves the frame mean by 0.58 — indistinguishable from noise — so
+a MAD threshold generous enough to catch duplicates would have *skipped
+people walking in*, the exact event the roving eye exists for. The max
+per-cell change separates cleanly: identical 0, dim figure 19, phone screen
+24, lamp 205.
+
+**Average-hash would also have failed.** aHash thresholds each pixel against
+the frame mean, so on a near-black frame it quantises sensor noise and two
+identical dark rooms hash far apart.
+
+Signatures are **mean-centred** so the camera's auto-exposure drift cancels:
+a uniform +25 brightness shift measures 0.0, while local structure survives.
+
+### Collapsing the backlog
+
+Capture-time dedup only helps future observations. For what is already
+stored:
+
+    sudo python3 /opt/testate/node.py --dedupe-observations --dry-run
+    sudo python3 /opt/testate/node.py --dedupe-observations
+
+It keeps the earliest of each cluster with a `seen` count, and writes a
+rotating backup to `/var/lib/testate/backups/` before touching anything.
+
 **Vision is available locally but not yet wired.** `granite` has no vision
 (`capabilities: [completion, tools]`); `qwen3.5:4b` does, and was verified
 describing a test frame locally in ~23s. The observe path still calls

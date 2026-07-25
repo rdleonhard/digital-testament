@@ -130,7 +130,11 @@ async function sendAnswer(){const a=document.getElementById('answer').value.trim
  try{const j=await api('/answer',{question:pendingQ,answer:a});pendingQ=null;add('sys','memory #'+j.count+' committed to the corpus — '+j.ack)}catch(e){add('sys','error: '+e.message)}busy(0)}
 async function song(){busy(1);try{const j=await api('/song');add('sys','♪ played "'+j.song+'" ('+j.mood+')')}catch(e){add('sys','error: '+e.message)}busy(0)}
 async function observe(){busy(1);const w=add('sys','the avatar opens its eye... (image is described, then deleted)');
- try{const j=await api('/observe');w.remove();add('av q',j.observation);setMood(j.mood);add('sys','kept as memory #'+j.count+' — words only, no image')}catch(e){w.textContent='error: '+e.message}busy(0)}
+ try{const j=await api('/observe');w.remove();
+  if(j.duplicate==='frame'){add('sys','the room is unchanged — nothing spent, nothing filed');if(j.observation)add('av q',j.observation)}
+  else if(j.duplicate==='text'){add('av q',j.observation);add('sys','the same scene in different words — noted as recurring, not filed again'+(j.seen?' (seen '+j.seen+'×)':''))}
+  else{add('av q',j.observation);setMood(j.mood);add('sys','kept as memory #'+j.count+' — words only, no image')}
+ }catch(e){w.textContent='error: '+e.message}busy(0)}
 function openJournal(){document.getElementById('jrn').classList.add('show');document.getElementById('jtext').focus();loadPast()}
 function closeJournal(){document.getElementById('jrn').classList.remove('show')}
 function esc(s){const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML}
