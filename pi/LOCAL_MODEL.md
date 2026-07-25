@@ -64,23 +64,63 @@ silently ignored.
 
 ## Journal entries (📓 on the local site)
 
-Paste an entry; the Jetson reads it and answers *why did he write this* and
-*why did he hand THIS one over*, plus what it evidences and what is
-conspicuously absent. `POST /journal {text, note}`, `GET /journals`.
+Paste an entry. The Jetson does exactly two things with it.
+`POST /journal {text}`, `GET /journals`.
+
+**1. Learns how he writes.** The persona has to sound like him, and a
+journal is the only place he writes with nobody watching. Revises
+`corpus["voice"]`: `syntax` and `diction` from the model, `punctuation` from
+a count, `tics` and `catchphrases` by accumulation.
+
+**2. Finds memories.** Lifts out the discrete durable things and commits
+them to the corpus in **his own first-person phrasing**, kept verbatim where
+a line is striking. His words, not a summary — the corpus is what teaches
+the persona to talk, so a paraphrase throws away the thing being collected.
 
 This path is **local-only and does not fall back to Venice.** A journal is
 the most private text in this system, and a silent failover would put it on
 someone else's server. If the Jetson is down, submission fails and says so.
 
-The raw entry is archived verbatim to `/var/lib/testate/journals.jsonl` —
-that is the evidence, and the Compilation will want it whole. Only a
-≤400-char distillation enters the corpus as a memory tagged `journal`,
-because `PROMPT_MEM_BUDGET` is 6500 chars for *all* memories and one long
-entry would otherwise swallow the persona prompt whole.
+The raw entry is archived verbatim to `/var/lib/testate/journals.jsonl` and
+is never itself a memory: `PROMPT_MEM_BUDGET` is 6500 chars for *all*
+memories, so one long entry would swallow the persona prompt. Extracted
+memories are capped at 5 per entry and 300 chars each, tagged `journal`
+(in `GROWN_TAGS`, so they rotate rather than posing as identity backbone).
 
-The analysis prompt is deliberately third-person and unkind: it reads the
-entry as evidence rather than self-report, on the principle already written
-into ECONOMY.md — a man is not always the best witness to himself.
+### Guardrails, each one earned in testing
+
+- **`register` and `humor` are structurally unwritable from a journal.**
+  They were written by hand and are good; a single thin entry rewrote
+  "courtroom precision crossed with maker-bench pragmatism" into "practical
+  and concise" when it was allowed to. The model is shown them for context
+  and cannot change them. The pre-journal voice is snapshotted once to
+  `voice_seed`, so the original is always recoverable.
+- **A phrase needs two sightings to reach the prompt.** One entry saying a
+  thing once is not a catchphrase — it promoted "Got the ESP32 talking..."
+  off a single mention, which the avatar would then have parroted forever.
+  Unconfirmed phrases wait in `voice_candidates` and show on the page as
+  "heard once".
+- **Punctuation is counted, never asked.** The model hallucinated ellipses
+  and parentheses that were nowhere in the text, through two rounds of
+  prompt tightening. Marks are countable, so `measure_punctuation()` counts
+  them and accumulates across every entry. The measured profile is withheld
+  from the model, and `_drop_punctuation_talk()` strips punctuation claims
+  out of `syntax` — otherwise the prompt asserts he uses ellipses two lines
+  after the count says he never does.
+- **No free-text note field.** An earlier version had one, and the model
+  mined the note itself for memories and catchphrases, filing metadata as
+  if he had written it. Anything still POSTing `note` is ignored.
+
+### Known limitation
+
+Titles still come back in headline Title Case perhaps half the time.
+`_detitle()` fixes the unambiguous cases ("ESP32 LAN Communication Triumph"
+→ "ESP32 LAN communication triumph") but deliberately leaves titles where a
+lowercase function word drops the ratio ("Shop Closed by Rain"). Detecting
+those too would mean lowercasing proper nouns — "Drive to New York on
+Saturday" → "drive to new york on saturday" — which is a worse failure than
+an ugly title. Two rounds of prompting did not fix it; an 8B at q3 does not
+hold fine-grained style rules reliably.
 
 **Vision is available locally but not yet wired.** `granite` has no vision
 (`capabilities: [completion, tools]`); `qwen3.5:4b` does, and was verified

@@ -14,6 +14,7 @@ import argparse
 import json
 import os
 import random
+import re
 import ssl
 import sys
 import time
@@ -452,68 +453,295 @@ ARCHIVIST = (
     "You are the archivist of a digital testament. A living man is handing "
     "you his own journal entries so that the persona built from his corpus "
     "-- the one that will have to answer for him after he is dead -- "
-    "understands him better.\n\n"
-    "Read the entry as EVIDENCE, not as self-report. A man is not always the "
-    "best witness to himself: what he chooses to record, how he phrases it, "
-    "and what he leaves out are all evidence. Your job is accuracy, not "
-    "kindness. If the entry shows something he would not say about himself, "
-    "say it plainly. Never invent facts the text does not support; where you "
-    "are inferring rather than observing, mark it as inference.\n\n"
-    "Two questions matter most:\n"
-    "  why_written -- what moved him to write this down at all\n"
-    "  why_shared  -- he chose THIS entry, out of everything he could have "
-    "given his own successor. What does that choice say about him? Consider "
-    "that he may be feeding it in for a reason he has not stated, or would "
-    "not admit.\n\n"
-    "Reply ONLY with a JSON object with these keys:\n"
-    '  why_written (string), why_shared (string), reveals (string: what it '
-    "evidences about him), absent (string: what is conspicuously missing, "
-    "avoided, or unsaid), themes (array of short lowercase tags), "
-    "mood (one of: curious, cheerful, pensive, wistful, alert), "
-    "digest (ONE third-person sentence, under 200 characters, that the "
-    "persona should carry forward as a durable memory of this entry)"
+    "understands him better. It has two jobs, and no others.\n\n"
+    "JOB 1 -- LEARN HOW HE WRITES. The persona has to sound like him, and a "
+    "journal is the only place he writes with nobody watching. Study the "
+    "prose itself, not the content: sentence length and rhythm, where he "
+    "runs on and where he clips short, punctuation habits (dashes, "
+    "ellipses, sentence fragments, capitalisation), his actual vocabulary, "
+    "what he does with contractions and profanity, whether he addresses "
+    "himself, how he opens and closes an entry. Quote his real phrases "
+    "rather than describing them in the abstract. Do NOT comment on "
+    "punctuation -- that is counted separately and is not your job. "
+    "You will be given the style profile learned so "
+    "far: REVISE it. Keep what the new entry confirms, sharpen what it "
+    "clarifies, and only drop something if this entry actively contradicts "
+    "it. Do not replace specifics with vaguer wording. If the entry is too "
+    "short to tell you anything new about a field, return that field "
+    "unchanged. 'register' is shown to you for context only -- it is "
+    "curated by hand, so echo it, never rewrite it.\n\n"
+    "JOB 2 -- FIND MEMORIES. Pull out the discrete, durable things worth "
+    "remembering: what happened, who was there, what he did, decided, made, "
+    "felt or noticed. One memory per distinct thing -- do not bundle a whole "
+    "entry into one lump, and do not invent a memory to pad the list. A "
+    "passing mention with nothing behind it is not a memory.\n\n"
+    "Write each memory in HIS WORDS. This is the part people get wrong. Do "
+    "not translate him into clean neutral prose -- keep his phrasing, his "
+    "rhythm, his repetitions and his asides, first person. Where a line of "
+    "his is striking, keep it verbatim. Compare:\n"
+    "  BAD  (voice thrown away): 'Solved after two days of troubleshooting; "
+    "the cause was the mDNS name rather than the firewall.'\n"
+    "  GOOD (voice kept): 'Got the ESP32 talking to the Pi at last -- the "
+    "mDNS name all along, not the firewall. Two days on that. Two days! "
+    "Always the boring answer.'\n"
+    "Titles work the same way: a plain concrete phrase, or one of his own. "
+    "Mechanical rule -- a title must NOT be in Title Case and must not read "
+    "like a headline. Begin it with a lowercase letter unless the first word "
+    "is a proper noun, and use no more than seven words. "
+    "'two days on the mDNS name' -- not 'ESP32 Connectivity Triumph'. "
+    "Never state as fact anything the entry does not say.\n\n"
+    "Reply ONLY with a JSON object:\n"
+    '{"style": {"syntax": str, "diction": str, '
+    '"tics": [str], "catchphrases": [str]}, '
+    '"style_change": str (one short line on what this entry taught you, or '
+    '"nothing new"), '
+    '"memories": [{"title": str (under 70 chars, his kind of phrase, not a '
+    'label), "narrative": str (first person, under 300 chars), '
+    '"tags": [str]}], '
+    '"mood": one of curious, cheerful, pensive, wistful, alert}'
 )
 
-# A journal can run to thousands of words. The persona prompt only has
-# PROMPT_MEM_BUDGET chars for ALL memories, so the raw entry never becomes a
-# memory -- it is archived verbatim and only the distilled digest is folded in.
-# Kept deliberately tight: journals rotate against interviews and observations
-# for the same budget, and a run of fat journal memories would crowd them out.
-JOURNAL_NARRATIVE_CAP = 400
+# The persona prompt has PROMPT_MEM_BUDGET (6500) chars for ALL memories, and
+# journal memories rotate against interviews and observations for it. An entry
+# yielding five fat memories would crowd out the rest, so both the count and
+# the length are capped and the raw entry is never itself a memory.
+MEM_PER_ENTRY = 5
+MEM_NARRATIVE_CAP = 300
+MEM_TITLE_CAP = 70
+STYLE_FIELD_CAP = 400
+STYLE_LIST_CAP = 12
+
+# Journals may only write the mechanical half of the voice. register and
+# humor were written by hand and a single thin entry WILL flatten them into
+# something vaguer if allowed to -- observed doing exactly that in testing.
+# They are shown to the model for context and are structurally unwritable.
+STYLE_FIELDS = ("syntax", "diction")
+STYLE_LISTS = ("tics", "catchphrases")
+STYLE_READONLY = ("register", "humor")
+# punctuation is measured from the text, never asked for -- see
+# measure_punctuation()
 
 
-def _fit(parts, cap):
-    """Join clauses in priority order, keeping only whole words.
+def _clean(s, cap):
+    """Collapse whitespace and trim to cap on a word boundary."""
+    s = " ".join((s or "").split())
+    if len(s) <= cap:
+        return s
+    return s[:cap].rsplit(" ", 1)[0].rstrip(",;:-") + "..."
 
-    Truncating the concatenation instead would spend the whole budget on
-    whichever clause happened to come first and cut it mid-word.
+
+PUNCT_WORDS = re.compile(
+    r"\b(ellips[ei]s|em-?dash|dash|parenthes[ei]s|semicolon|colon|comma|"
+    r"exclamation|question mark|punctuation|capitalis|capitaliz)", re.I)
+
+
+def _drop_punctuation_talk(s):
+    """Remove punctuation claims from a prose style field.
+
+    The model keeps describing punctuation inside 'syntax' even when told not
+    to and when the measured profile is withheld from it -- and it gets the
+    claims wrong, so the prompt ends up asserting he uses ellipses two
+    sentences after the count says he never does. Punctuation has one
+    authoritative source (the count); this strips the rival.
     """
-    out = ""
-    for label, text in parts:
-        text = " ".join((text or "").split())
-        if not text:
-            continue
-        clause = (label + " " if label else "") + text
-        room = cap - len(out) - (1 if out else 0)
-        if room < 40:            # no useful room left for another clause
-            break
-        if len(clause) > room:
-            clause = clause[:room].rsplit(" ", 1)[0].rstrip(",;:") + "..."
-        out = (out + " " + clause).strip() if out else clause
+    parts = re.split(r"\s*;\s*", s or "")
+    kept = [p for p in parts if p and not PUNCT_WORDS.search(p)]
+    out = "; ".join(kept).strip(" ;,")
+    return out if out else ""
+
+
+def _detitle(title):
+    """Undo headline Title Case, preserving acronyms.
+
+    Fires only when nearly every word is capitalised, which is the headline
+    signature -- a sentence-style title ('Two days on the mDNS name') has
+    lowercase function words and is left alone. Known cost: a proper noun
+    inside a genuinely Title-Cased title loses its capital ('Called Mom' ->
+    'called mom'). Judged the lesser evil against 'ESP32 LAN Communication
+    Triumph', which two rounds of prompting failed to prevent.
+    """
+    words = title.split()
+    alpha = [w for w in words if w[:1].isalpha()]
+    if len(alpha) < 3:
+        return title
+    capped = [w for w in alpha if w[:1].isupper()]
+    if len(capped) / len(alpha) < 0.8:
+        return title
+    out = []
+    for w in words:
+        out.append(w if w.isupper() and len(w) > 1 else w[:1].lower() + w[1:])
+    return " ".join(out)
+
+
+def measure_punctuation(text, stats):
+    """Count his punctuation habits instead of asking the model about them.
+
+    The model hallucinated ellipses and parentheses that were nowhere in the
+    entry, twice, through two rounds of prompt tightening. Marks are
+    countable, so they get counted -- accumulated across every entry, which
+    also makes the description more truthful the more he pastes.
+    """
+    s = dict(stats or {})
+    s["entries"] = s.get("entries", 0) + 1
+    s["words"] = s.get("words", 0) + len(text.split())
+    sents = [x for x in re.split(r"[.!?]+\s|\n+", text) if x.strip()]
+    s["sentences"] = s.get("sentences", 0) + len(sents)
+    for name, pat in (("dash", r"--|—|–"),
+                      ("ellipsis", r"\.\.\.|…"),
+                      ("paren", r"\("),
+                      ("exclaim", r"!"),
+                      ("question", r"\?"),
+                      ("semicolon", r";"),
+                      ("colon", r":"),
+                      ("caps", r"\b[A-Z]{3,}\b")):
+        s[name] = s.get(name, 0) + len(re.findall(pat, text))
+    # sentence fragments: no finite verb is too hard, so use shortness
+    s["fragments"] = s.get("fragments", 0) + sum(
+        1 for x in sents if 0 < len(x.split()) <= 4)
+    return s
+
+
+def describe_punctuation(s):
+    """Turn the counts into one honest sentence for the persona prompt."""
+    if not s or not s.get("entries"):
+        return ""
+    sents = max(s.get("sentences", 0), 1)
+    words = max(s.get("words", 0), 1)
+    bits = ["averages {:.0f} words a sentence".format(words / sents)]
+    per = lambda k: s.get(k, 0) / sents          # noqa: E731
+    named = (("dash", "em-dashes"), ("ellipsis", "ellipses"),
+             ("paren", "parentheses"), ("exclaim", "exclamation marks"),
+             ("semicolon", "semicolons"), ("colon", "colons"))
+    used = [(label, per(k)) for k, label in named if s.get(k, 0)]
+    used.sort(key=lambda x: -x[1])
+    for label, rate in used[:3]:
+        if rate >= 0.5:
+            bits.append("leans on {} heavily".format(label))
+        elif rate >= 0.15:
+            bits.append("uses {} regularly".format(label))
+        else:
+            bits.append("uses {} sparingly".format(label))
+    unused = [label for k, label in named if not s.get(k, 0)]
+    if unused:
+        bits.append("never uses " + ", ".join(unused[:3]))
+    if per("fragments") >= 0.2:
+        bits.append("writes in fragments often")
+    if s.get("caps", 0):
+        bits.append("shouts in capitals occasionally")
+    return ("Measured across {} entr{}: ".format(
+        s["entries"], "y" if s["entries"] == 1 else "ies") + "; ".join(bits)
+        + ".")
+
+
+def learned_style(context=False):
+    """The style profile as it stands.
+
+    context=True also includes the hand-curated read-only fields, which the
+    model needs to see to stay consistent but must not overwrite.
+    """
+    v = corpus.get("voice", {})
+    out = {f: v.get(f, "") for f in STYLE_FIELDS}
+    for f in STYLE_LISTS:
+        out[f] = [x for x in (v.get(f) or []) if isinstance(x, str)]
+    if context:
+        # context=True is the model-facing view. Punctuation is withheld from
+        # it on purpose: when the model could see it, it started describing
+        # punctuation inside the syntax field and contradicted the count.
+        for f in STYLE_READONLY:
+            if v.get(f):
+                out[f] = v[f]
+    elif v.get("punctuation"):
+        out["punctuation"] = v["punctuation"]
     return out
+
+
+def merge_style(new):
+    """Fold a revised profile into corpus['voice'].
+
+    Merged rather than assigned: the seed voice block was written by hand and
+    is good, so a thin entry must not be able to flatten it. Lists union
+    (his phrases accumulate); strings only overwrite when the model actually
+    returned something. The pre-journal voice is snapshotted once so the
+    hand-written original is always recoverable.
+    """
+    v = corpus.setdefault("voice", {})
+    if "voice_seed" not in corpus:
+        corpus["voice_seed"] = json.loads(json.dumps(v))
+    changed = []
+    for f in STYLE_FIELDS:
+        cand = _clean(_drop_punctuation_talk(new.get(f)), STYLE_FIELD_CAP)
+        if cand and cand != v.get(f):
+            v[f] = cand
+            changed.append(f)
+    # Phrases and habits need corroboration before they reach the persona
+    # prompt. One entry saying a thing once is not a catchphrase -- observed
+    # promoting "Got the ESP32 talking..." off a single sighting, which the
+    # avatar would then have parroted forever. A candidate must turn up in a
+    # second entry to graduate.
+    pool = corpus.setdefault("voice_candidates", {})
+    for f in STYLE_LISTS:
+        have = [x for x in (v.get(f) or []) if isinstance(x, str)]
+        seen = {x.strip().lower() for x in have}
+        waiting = pool.setdefault(f, {})
+        # established entries in EITHER list disqualify a candidate: the model
+        # echoes known catchphrases back inside "tics", which would otherwise
+        # queue them all over again in the other list's waiting room
+        established = set(seen)
+        for other in STYLE_LISTS:
+            established |= {x.strip().lower()
+                            for x in (v.get(other) or [])
+                            if isinstance(x, str)}
+        promoted, noted = 0, 0
+        for cand in (new.get(f) or []):
+            if not isinstance(cand, str):
+                continue
+            cand = _clean(cand, 120)
+            key = cand.strip().lower()
+            if not cand or key in established:
+                continue            # already established somewhere
+            if waiting.get(key, {}).get("n", 0) >= 1:
+                have.append(cand)   # second sighting: graduate it
+                seen.add(key)
+                waiting.pop(key, None)
+                promoted += 1
+            else:
+                waiting[key] = {"n": 1, "text": cand}
+                noted += 1
+        if promoted:
+            # keep the newest -- his current voice beats his 2019 voice
+            v[f] = have[-STYLE_LIST_CAP:]
+            changed.append("{}(+{})".format(f, promoted))
+        if noted:
+            changed.append("{}?{}".format(f, noted))
+        # do not let the waiting room grow without bound
+        if len(waiting) > 40:
+            pool[f] = dict(list(waiting.items())[-40:])
+    return changed
+
+
+def style_candidates():
+    """Phrases seen once, still waiting for a second sighting."""
+    pool = corpus.get("voice_candidates", {})
+    return {f: [d.get("text", "") for d in (pool.get(f) or {}).values()]
+            for f in STYLE_LISTS}
 
 
 def journal_path():
     return BASE / "journals.jsonl"
 
 
-def do_journal(text, note=""):
-    """Interrogate a pasted journal entry, then keep the words two ways.
+def do_journal(text, note=None):
+    """Read a pasted journal entry for style, and mine it for memories.
 
-    The raw entry is archived verbatim to journals.jsonl -- that is the
-    evidence, and the Compilation will want it whole one day. Only a short
-    digest enters the corpus as a memory, because the persona prompt has a
-    fixed character budget that one long entry would otherwise swallow.
+    Two outputs. The style profile in corpus['voice'] gets revised, so the
+    persona gradually learns to write like him rather than like a model.
+    Discrete memories are lifted out in his own first-person phrasing and
+    committed to the corpus -- his words, because the corpus is what teaches
+    the persona to talk.
+
+    The raw entry is archived verbatim to journals.jsonl and is never itself
+    a memory: the persona prompt has a fixed character budget one long entry
+    would swallow, and the Compilation will want the entry whole anyway.
 
     Inference is LOCAL ONLY and deliberately does not fall back to Venice: a
     journal is the most private text in this system, and a silent failover
@@ -528,55 +756,82 @@ def do_journal(text, note=""):
             "journal processing needs the local model (cfg.local.url); "
             "it is never sent to Venice")
 
-    ask = "Journal entry:\n\n" + text[:12000]
-    if note:
-        ask += "\n\n(He added, handing it over: {})".format(note[:500])
+    # Nothing but the entry itself goes in the user turn. An earlier version
+    # appended a free-text "handing it over" note here and the model duly
+    # mined the note for memories and catchphrases, filing the metadata as if
+    # he had written it. The note served the old why-did-he-share-this
+    # question and is gone with it; anything still sending one is ignored.
+    ask = ("Style profile learned so far. Revise 'syntax', 'diction', "
+           "'tics' and 'catchphrases' only -- 'register' and 'humor' are "
+           "context for you and are maintained by hand:\n"
+           + json.dumps(learned_style(context=True), indent=2)
+           + "\n\nJournal entry:\n\n" + text[:12000])
 
     raw = local([{"role": "system", "content": ARCHIVIST},
                  {"role": "user", "content": ask}],
-                max_tokens=700, fmt="json")
+                max_tokens=1400, fmt="json")
     try:
         a = json.loads(raw)
     except ValueError:
-        # Model drifted off JSON. Keep the words rather than lose the entry.
-        a = {"why_written": raw.strip()[:1500], "why_shared": "",
-             "reveals": "", "absent": "", "themes": [], "mood": "pensive",
-             "digest": "A journal entry the archivist could not parse."}
+        raise RuntimeError(
+            "the model did not return usable JSON; entry not filed "
+            "(it is still in the box -- try again)")
 
     mood = a.get("mood") if a.get("mood") in avatar.MOODS else "pensive"
-    digest = (a.get("digest") or "").strip() or text[:160]
 
-    # What the persona actually carries. Priority order matters: the digest
-    # and what the entry EVIDENCES are worth more to a persona than the
-    # circumstances of writing, and why-he-shared-it is the sharpest of the
-    # lot. why_written is the first to be dropped -- it survives in the
-    # archive and on the page either way.
-    narrative = _fit([
-        ("", digest),
-        ("What it shows:", a.get("reveals")),
-        ("Why he offered it:", a.get("why_shared")),
-    ], JOURNAL_NARRATIVE_CAP)
+    # --- job 1: style ---
+    style_changed = merge_style(a.get("style") or {})
+    # punctuation is counted, not inferred, and accumulates over every entry
+    corpus["voice_stats"] = measure_punctuation(
+        text, corpus.get("voice_stats"))
+    desc = describe_punctuation(corpus["voice_stats"])
+    if desc:
+        corpus.setdefault("voice", {})["punctuation"] = desc
+        style_changed.append("punctuation(measured)")
 
-    stamp = time.strftime("%Y-%m-%d %H:%M")
-    corpus.setdefault("memories", []).append({
-        "title": "From his journal, " + stamp,
-        "narrative": narrative,
-        "tags": ["journal"] + [t for t in (a.get("themes") or [])[:4]
-                               if isinstance(t, str)],
-    })
+    # --- job 2: memories ---
+    have_titles = {(m.get("title") or "").strip().lower()
+                   for m in corpus.get("memories", [])}
+    added = []
+    for cand in (a.get("memories") or [])[:MEM_PER_ENTRY]:
+        if not isinstance(cand, dict):
+            continue
+        title = _detitle(_clean(cand.get("title"), MEM_TITLE_CAP))
+        narrative = _clean(cand.get("narrative"), MEM_NARRATIVE_CAP)
+        if not narrative:
+            continue
+        if not title:
+            title = narrative[:60]
+        if title.strip().lower() in have_titles:
+            continue                      # same beat already remembered
+        have_titles.add(title.strip().lower())
+        tags = ["journal"] + [_clean(t, 24) for t in (cand.get("tags") or [])[:3]
+                              if isinstance(t, str)]
+        mem = {"title": title, "narrative": narrative, "tags": tags}
+        corpus.setdefault("memories", []).append(mem)
+        added.append(mem)
+
     avatar.save(corpus)
     backup_corpus()
     prompt = avatar.build_prompt(corpus)
 
     entry = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "text": text,
-             "note": note, "analysis": a, "chars": len(text)}
+             "note": note, "chars": len(text),
+             "style": a.get("style") or {},
+             "style_change": a.get("style_change", ""),
+             "style_changed": style_changed,
+             "memories": added}
     with journal_path().open("a") as f:
         f.write(json.dumps(entry) + "\n")
 
     state["mood"] = mood
     if buz:
         buz.mood(mood)
-    return {"analysis": a, "mood": mood,
+    return {"style": learned_style(),
+            "candidates": style_candidates(),
+            "style_change": a.get("style_change", ""),
+            "style_changed": style_changed,
+            "memories": added, "mood": mood,
             "count": len(corpus.get("memories", [])),
             "archived": len(text)}
 
@@ -593,7 +848,8 @@ def recent_journals(limit=12):
             continue
         out.append({"ts": j.get("ts"), "chars": j.get("chars"),
                     "excerpt": (j.get("text") or "")[:140],
-                    "analysis": j.get("analysis", {})})
+                    "style_change": j.get("style_change", ""),
+                    "n_memories": len(j.get("memories") or [])})
     return list(reversed(out))
 
 

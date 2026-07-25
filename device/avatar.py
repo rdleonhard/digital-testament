@@ -90,9 +90,14 @@ def build_prompt(corpus):
     p.append("")
     if voice:
         p.append("== VOICE ==")
-        for k in ("register", "humor"):
+        p.append("Write the way he writes. These observations are drawn from "
+                 "his own journals; match them rather than describing them.")
+        # syntax/diction/punctuation are learned from pasted journal entries
+        for k in ("register", "humor", "syntax", "diction", "punctuation"):
             if voice.get(k):
                 p.append("{}: {}".format(k, voice[k]))
+        if voice.get("tics"):
+            p.append("Habits to reproduce: " + " / ".join(voice["tics"]))
         if voice.get("catchphrases"):
             p.append("Catchphrases (sparingly): " + " / ".join(voice["catchphrases"]))
         p.append("")
