@@ -288,7 +288,18 @@ def note_recurrence(mem):
     mem["last_seen"] = time.strftime("%Y-%m-%d %H:%M")
 
 
-def dedupe_stored_observations(dry_run=False):
+def service_is_running():
+    """Is a live node holding the corpus in memory right now?"""
+    try:
+        import subprocess
+        out = subprocess.run(["systemctl", "is-active", "testate"],
+                             capture_output=True, text=True, timeout=10)
+        return out.stdout.strip() == "active"
+    except Exception:
+        return False
+
+
+def dedupe_stored_observations(dry_run=False, force=False):
     """Collapse duplicate observations already in the corpus.
 
     Dedup at capture time only helps future observations, and the backlog is
@@ -296,7 +307,21 @@ def dedupe_stored_observations(dry_run=False):
     near-identical recent observations sits at the front of the prompt budget
     and suppresses everything behind it. The earliest of each cluster is kept,
     carrying a 'seen' count for the rest.
+
+    Refuses to run against a live service, because that silently does
+    nothing: the running node holds the whole corpus in memory and rewrites
+    the file on its next save, so a collapse done underneath it is reverted
+    the moment an observation or an answer lands. Learned the hard way -- the
+    first run of this looked like it worked and was gone minutes later.
     """
+    if service_is_running() and not (dry_run or force):
+        print("REFUSING: the testate service is live and holds the corpus in\n"
+              "memory -- it will overwrite this collapse on its next save.\n"
+              "  sudo systemctl stop testate\n"
+              "  sudo python3 %s --dedupe-observations\n"
+              "  sudo systemctl start testate\n"
+              "(--force overrides, --dry-run is always safe)" % __file__)
+        raise SystemExit(1)
     mems = corpus.get("memories", [])
     keep, dropped = [], []
     for m in mems:
@@ -1187,6 +1212,9 @@ def main():
                          "(writes a backup first); --dry-run to preview")
     ap.add_argument("--dry-run", action="store_true",
                     help="with --dedupe-observations, report and change nothing")
+    ap.add_argument("--force", action="store_true",
+                    help="run --dedupe-observations even with the service live "
+                         "(it will be overwritten; stop the service instead)")
     ap.add_argument("--port", type=int, default=80)
     args = ap.parse_args()
 
@@ -1199,7 +1227,7 @@ def main():
         return
 
     if args.dedupe_observations:
-        dedupe_stored_observations(dry_run=args.dry_run)
+        dedupe_stored_observations(dry_run=args.dry_run, force=args.force)
         return
 
     prompt = avatar.build_prompt(corpus)

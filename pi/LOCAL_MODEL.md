@@ -165,13 +165,27 @@ a uniform +25 brightness shift measures 0.0, while local structure survives.
 ### Collapsing the backlog
 
 Capture-time dedup only helps future observations. For what is already
-stored:
+stored, **stop the service first**:
 
-    sudo python3 /opt/testate/node.py --dedupe-observations --dry-run
+    sudo python3 /opt/testate/node.py --dedupe-observations --dry-run   # safe any time
+    sudo systemctl stop testate
     sudo python3 /opt/testate/node.py --dedupe-observations
+    sudo systemctl start testate
 
 It keeps the earliest of each cluster with a `seen` count, and writes a
 rotating backup to `/var/lib/testate/backups/` before touching anything.
+
+**Why the stop matters, and it is not optional.** The running node holds the
+entire corpus in memory and rewrites `corpus.json` wholesale on its next
+save. Collapse the file underneath it and the change survives only until the
+next observation, answer or journal entry — then the stale in-memory copy
+lands on top and the duplicates are all back. This happened: the first run
+reported 104 → 63, and minutes later the file was 109 again with the
+`seen` counters gone. The command now refuses to run against a live service
+(exit 1) unless you pass `--force`; `--dry-run` is always allowed.
+
+Any maintenance that edits `corpus.json` out of band has the same hazard —
+stop the service, edit, start it.
 
 **Vision is available locally but not yet wired.** `granite` has no vision
 (`capabilities: [completion, tools]`); `qwen3.5:4b` does, and was verified
