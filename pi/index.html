@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TESTATE·0</title>
+<style>
+:root{--bg:#0d1117;--panel:#161b22;--ink:#e6edf3;--dim:#8b949e;--gold:#d4a94e;--me:#1f3a5f;--av:#21262d;--line:#30363d}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 ui-monospace,Menlo,monospace;display:flex;flex-direction:column;height:100dvh}
+header{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+header h1{font-size:15px;margin:0;letter-spacing:.18em;color:var(--gold)}
+#mood{margin-left:auto;color:var(--dim);font-size:13px}
+#mood b{color:var(--ink)}
+#dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--gold);margin-right:6px;vertical-align:1px}
+#log{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:82%;padding:9px 13px;border-radius:10px;white-space:pre-wrap;word-wrap:break-word}
+.me{background:var(--me);align-self:flex-end;border-bottom-right-radius:3px}
+.av{background:var(--av);border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:3px}
+.sys{align-self:center;color:var(--dim);font-size:12px;font-style:italic}
+.q{border-left:3px solid var(--gold)}
+.note{color:var(--gold)}
+footer{padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px}
+input{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:10px 12px;font:inherit}
+input:focus{outline:1px solid var(--gold)}
+button{background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:10px 14px;font:inherit;cursor:pointer}
+button:hover{border-color:var(--gold)}
+button:disabled{opacity:.4;cursor:wait}
+#ans{display:none;padding:0 16px 12px;gap:8px}
+#ans.show{display:flex}
+#feedbtn{background:none;border:1px solid var(--line);border-radius:8px;color:var(--gold);padding:2px 10px;font:inherit;cursor:pointer;margin-left:10px}
+#feedbtn:hover{border-color:var(--gold)}
+#feed{display:none;max-height:38vh;overflow-y:auto;border-bottom:1px solid var(--line);background:var(--panel);padding:10px 16px}
+#feed.show{display:block}
+#feedhead{color:var(--gold);font-size:12px;letter-spacing:.12em;margin-bottom:8px}
+#feedhead span{color:var(--dim);letter-spacing:0}
+.wh{padding:6px 0;border-bottom:1px dashed var(--line);font-size:13px}
+.wh:last-child{border-bottom:none}
+.wh time{color:var(--dim);font-size:11px;margin-right:8px}
+.wh .fail{color:#e0645c;font-size:11px;margin-left:6px}
+#jrn{display:none;position:fixed;inset:0;background:rgba(4,7,12,.86);z-index:9;padding:20px;overflow-y:auto}
+#jrn.show{display:block}
+#jrnbox{max-width:720px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+#jrnbox h2{margin:0 0 4px;font-size:13px;letter-spacing:.16em;color:var(--gold)}
+#jrnbox p.hint{margin:0 0 12px;color:var(--dim);font-size:12px;line-height:1.45}
+#jtext{width:100%;min-height:230px;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:11px;font:inherit;resize:vertical}
+#jnote{width:100%;margin-top:8px;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:9px 11px;font:inherit}
+#jtext:focus,#jnote:focus{outline:1px solid var(--gold)}
+.jrow{display:flex;gap:8px;margin-top:10px;align-items:center}
+.jrow .grow{flex:1;color:var(--dim);font-size:11px}
+.an{margin-top:14px;border-top:1px solid var(--line);padding-top:12px;font-size:13px}
+.an h3{margin:12px 0 3px;font-size:11px;letter-spacing:.14em;color:var(--gold);text-transform:uppercase}
+.an h3:first-child{margin-top:0}
+.an p{margin:0;white-space:pre-wrap}
+.an .tags{margin-top:10px}
+.an .tag{display:inline-block;border:1px solid var(--line);border-radius:20px;padding:1px 9px;margin:2px 4px 2px 0;font-size:11px;color:var(--dim)}
+.an .absent{color:#c8a2c8}
+.past{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}
+.past .pj{padding:7px 0;border-bottom:1px dashed var(--line);font-size:12px}
+.past .pj:last-child{border-bottom:none}
+.past .pj time{color:var(--dim);font-size:11px;margin-right:8px}
+.past .pj .dg{color:var(--ink)}
+</style>
+</head>
+<body>
+<header>
+  <h1>TESTATE&middot;0</h1>
+  <button id="feedbtn" onclick="toggleFeed()" title="whispers sent to the planet">&#9790;</button>
+  <span id="mood"><span id="dot"></span><b id="moodname">waking</b></span>
+</header>
+<div id="feed">
+  <div id="feedhead">whispers to the planet <span id="feedship"></span></div>
+  <div id="feedlist"></div>
+</div>
+<div id="log">
+  <div class="msg sys">self-hosted avatar node &middot; corpus lives on this device &middot; pseudonymous by design</div>
+</div>
+<div id="ans">
+  <input id="answer" placeholder="answer its question... this becomes a memory">
+  <button onclick="sendAnswer()">Commit memory</button>
+</div>
+<footer>
+  <input id="box" placeholder="say something..." onkeydown="if(event.key==='Enter')send()">
+  <button id="b1" onclick="send()">Send</button>
+  <button id="b2" onclick="interview()" title="the avatar asks about its own life">Ask&nbsp;me</button>
+  <button id="b3" onclick="song()" title="play a tune">&#9834;</button>
+  <button id="b4" onclick="observe()" title="the avatar looks through its camera; only its words are kept">&#128065;</button>
+  <button id="b5" onclick="openJournal()" title="paste a journal entry for the reliquary to read">&#128211;</button>
+</footer>
+<div id="jrn" onclick="if(event.target===this)closeJournal()">
+  <div id="jrnbox">
+    <h2>PASTE A JOURNAL ENTRY</h2>
+    <p class="hint">Read on the Jetson, never sent to Venice. It is asked two things:
+      <em>why did he write this</em>, and <em>why did he hand this one over</em>.
+      The entry is archived whole; only a short digest enters the corpus.</p>
+    <textarea id="jtext" placeholder="paste the entry..."></textarea>
+    <input id="jnote" placeholder="optional — anything you want to say handing it over">
+    <div class="jrow">
+      <span class="grow" id="jstat"></span>
+      <button onclick="closeJournal()">Close</button>
+      <button id="jgo" onclick="sendJournal()">Read it</button>
+    </div>
+    <div id="janalysis"></div>
+    <div class="past" id="jpast"></div>
+  </div>
+</div>
+<script>
+const log=document.getElementById('log'),box=document.getElementById('box');
+let pendingQ=null;
+const MOODC={curious:'#d4a94e',cheerful:'#4ec97a',pensive:'#7aa2f7',wistful:'#b48ead',alert:'#e0645c'};
+function add(cls,text){const d=document.createElement('div');d.className='msg '+cls;d.textContent=text;log.appendChild(d);log.scrollTop=log.scrollHeight;return d}
+function setMood(m,sang){document.getElementById('moodname').textContent=m+(sang?' ♪':'');document.getElementById('dot').style.background=MOODC[m]||'#d4a94e'}
+function busy(b){for(const id of['b1','b2','b3','b4']){const el=document.getElementById(id);if(el)el.disabled=b}}
+async function api(path,body){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});if(!r.ok)throw new Error(await r.text());return r.json()}
+async function send(){const t=box.value.trim();if(!t)return;box.value='';add('me',t);busy(1);const w=add('sys','thinking...');
+ try{const j=await api('/chat',{msg:t});w.remove();add('av',j.reply);setMood(j.mood,j.sang)}catch(e){w.textContent='error: '+e.message}busy(0)}
+async function refreshAskLabel(){try{const j=await(await fetch('/status')).json();
+ document.getElementById('b2').innerHTML=j.pending>0?'Ask&nbsp;me&nbsp;('+j.pending+')':'Ask&nbsp;me'}catch(e){}}
+async function interview(){busy(1);const w=add('sys','the avatar is wondering about itself...');
+ try{const j=await api('/interview');w.remove();pendingQ=j.question;add('av q',j.question);setMood(j.mood);document.getElementById('ans').classList.add('show');document.getElementById('answer').focus();refreshAskLabel()}catch(e){w.textContent='error: '+e.message}busy(0)}
+async function sendAnswer(){const a=document.getElementById('answer').value.trim();if(!a||!pendingQ)return;
+ add('me',a);document.getElementById('answer').value='';document.getElementById('ans').classList.remove('show');busy(1);
+ try{const j=await api('/answer',{question:pendingQ,answer:a});pendingQ=null;add('sys','memory #'+j.count+' committed to the corpus — '+j.ack)}catch(e){add('sys','error: '+e.message)}busy(0)}
+async function song(){busy(1);try{const j=await api('/song');add('sys','♪ played "'+j.song+'" ('+j.mood+')')}catch(e){add('sys','error: '+e.message)}busy(0)}
+async function observe(){busy(1);const w=add('sys','the avatar opens its eye... (image is described, then deleted)');
+ try{const j=await api('/observe');w.remove();add('av q',j.observation);setMood(j.mood);add('sys','kept as memory #'+j.count+' — words only, no image')}catch(e){w.textContent='error: '+e.message}busy(0)}
+function openJournal(){document.getElementById('jrn').classList.add('show');document.getElementById('jtext').focus();loadPast()}
+function closeJournal(){document.getElementById('jrn').classList.remove('show')}
+function esc(s){const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML}
+function section(h,t,cls){return t?'<h3>'+h+'</h3><p'+(cls?' class="'+cls+'"':'')+'>'+esc(t)+'</p>':''}
+function renderAnalysis(a){
+ let h='<div class="an">';
+ h+=section('Why he wrote it',a.why_written);
+ h+=section('Why he handed it over',a.why_shared);
+ h+=section('What it evidences',a.reveals);
+ h+=section('What is absent',a.absent,'absent');
+ if(a.themes&&a.themes.length){h+='<div class="tags">';for(const t of a.themes)h+='<span class="tag">'+esc(t)+'</span>';h+='</div>'}
+ return h+'</div>'}
+async function sendJournal(){
+ const t=document.getElementById('jtext').value.trim();if(!t)return;
+ const note=document.getElementById('jnote').value.trim();
+ const go=document.getElementById('jgo'),stat=document.getElementById('jstat');
+ go.disabled=true;stat.textContent='the reliquary is reading... (8B model, this takes a moment)';
+ document.getElementById('janalysis').innerHTML='';
+ try{const j=await api('/journal',{text:t,note:note});
+  document.getElementById('janalysis').innerHTML=renderAnalysis(j.analysis);
+  stat.textContent='archived '+j.archived+' chars · memory #'+j.count+' · '+j.mood;
+  setMood(j.mood);
+  document.getElementById('jtext').value='';document.getElementById('jnote').value='';
+  add('sys','journal entry read by the reliquary — kept as memory #'+j.count);
+  loadPast();
+ }catch(e){stat.textContent='error: '+e.message}
+ go.disabled=false}
+async function loadPast(){const el=document.getElementById('jpast');
+ try{const j=await(await fetch('/journals')).json();
+  if(!j.local){el.innerHTML='<div class="pj">the local model is not configured (cfg.local.url) — journals are never sent to Venice, so this stays off until it is</div>';return}
+  if(!j.journals.length){el.innerHTML='<div class="pj">no entries read yet</div>';return}
+  let h='';for(const p of j.journals){h+='<div class="pj"><time>'+esc((p.ts||'').replace('T',' '))+'</time>'+
+   '<span class="dg">'+esc((p.analysis&&p.analysis.digest)||p.excerpt)+'</span></div>'}
+  el.innerHTML=h}catch(e){el.innerHTML='<div class="pj">feed error: '+esc(e.message)+'</div>'}}
+let feedTimer=null;
+async function loadFeed(){const list=document.getElementById('feedlist');
+ try{const r=await fetch('/whispers');const j=await r.json();list.innerHTML='';
+  if(!j.whispers.length){list.textContent='(nothing whispered yet — reflections post at twilight)';return}
+  for(const w of j.whispers){const d=document.createElement('div');d.className='wh';
+   const t=document.createElement('time');t.textContent=w.ts.replace('T',' ');d.appendChild(t);
+   d.appendChild(document.createTextNode(w.text));
+   if(!w.ok){const s=document.createElement('span');s.className='fail';s.textContent='(unheard: '+(w.err||'?')+')';d.appendChild(s)}
+   else if(w.err){const s=document.createElement('span');s.className='fail';s.style.color='#4ec97a';s.textContent='('+w.err+')';d.appendChild(s)}
+   list.appendChild(d)}
+ }catch(e){list.textContent='feed error: '+e.message}}
+function toggleFeed(){const f=document.getElementById('feed');
+ if(f.classList.contains('show')){f.classList.remove('show');clearInterval(feedTimer);feedTimer=null;return}
+ f.classList.add('show');document.getElementById('feedlist').textContent='listening...';
+ loadFeed();feedTimer=setInterval(loadFeed,30000)}
+fetch('/status').then(r=>r.json()).then(j=>{setMood(j.mood);const u=j.urbit&&j.urbit.enabled?' · ship '+j.urbit.ship:'';document.getElementById('feedship').textContent=u;if(j.pending>0)document.getElementById('b2').innerHTML='Ask&nbsp;me&nbsp;('+j.pending+')';add('sys',j.handle+' online · '+j.memories+' memories'+u+' · corpus backup at /corpus')}).catch(()=>{});
+</script>
+</body>
+</html>
