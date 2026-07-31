@@ -28,8 +28,8 @@ button:hover{border-color:var(--gold)}
 button:disabled{opacity:.4;cursor:wait}
 #ans{display:none;padding:0 16px 12px;gap:8px}
 #ans.show{display:flex}
-#feedbtn{background:none;border:1px solid var(--line);border-radius:8px;color:var(--gold);padding:2px 10px;font:inherit;cursor:pointer;margin-left:10px}
-#feedbtn:hover{border-color:var(--gold)}
+#feedbtn,#corpusbtn{background:none;border:1px solid var(--line);border-radius:8px;color:var(--gold);padding:2px 10px;font:inherit;cursor:pointer;margin-left:10px}
+#feedbtn:hover,#corpusbtn:hover{border-color:var(--gold)}
 #feed{display:none;max-height:38vh;overflow-y:auto;border-bottom:1px solid var(--line);background:var(--panel);padding:10px 16px}
 #feed.show{display:block}
 #feedhead{color:var(--gold);font-size:12px;letter-spacing:.12em;margin-bottom:8px}
@@ -38,12 +38,55 @@ button:disabled{opacity:.4;cursor:wait}
 .wh:last-child{border-bottom:none}
 .wh time{color:var(--dim);font-size:11px;margin-right:8px}
 .wh .fail{color:#e0645c;font-size:11px;margin-left:6px}
+#jrn{display:none;position:fixed;inset:0;background:rgba(4,7,12,.86);z-index:9;padding:20px;overflow-y:auto}
+#jrn.show{display:block}
+#jrnbox{max-width:720px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+#jrnbox h2{margin:0 0 4px;font-size:13px;letter-spacing:.16em;color:var(--gold)}
+#jrnbox p.hint{margin:0 0 12px;color:var(--dim);font-size:12px;line-height:1.45}
+#jtext{width:100%;min-height:230px;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:11px;font:inherit;resize:vertical}
+#jtext:focus{outline:1px solid var(--gold)}
+.jrow{display:flex;gap:8px;margin-top:10px;align-items:center}
+.jrow .grow{flex:1;color:var(--dim);font-size:11px}
+.an{margin-top:14px;border-top:1px solid var(--line);padding-top:12px;font-size:13px}
+.an h3{margin:12px 0 3px;font-size:11px;letter-spacing:.14em;color:var(--gold);text-transform:uppercase}
+.an h3:first-child{margin-top:0}
+.an p{margin:0;white-space:pre-wrap}
+.an .tags{margin-top:10px}
+.an .tag{display:inline-block;border:1px solid var(--line);border-radius:20px;padding:1px 9px;margin:2px 4px 2px 0;font-size:11px;color:var(--dim)}
+.an .absent{color:#c8a2c8}
+.an .chg{color:var(--dim);font-size:11.5px;font-style:italic;margin-top:4px}
+.mem{border-left:2px solid var(--gold);padding:5px 0 5px 10px;margin:8px 0}
+.mem b{color:var(--ink);font-size:12.5px}
+.mem p{margin:3px 0 0;color:var(--dim)}
+.sf{margin:7px 0;font-size:12.5px}
+.sf>span{display:block;font-size:10.5px;letter-spacing:.1em;color:var(--dim);text-transform:uppercase}
+.past .pj .nm{float:right;color:var(--gold);font-size:11px}
+.an .tag.cand{border-style:dashed;opacity:.75}
+.past{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}
+.past .pj{padding:7px 0;border-bottom:1px dashed var(--line);font-size:12px}
+.past .pj:last-child{border-bottom:none}
+.past .pj time{color:var(--dim);font-size:11px;margin-right:8px}
+.past .pj .dg{color:var(--ink)}
+#corpus{display:none;position:fixed;inset:0;background:rgba(4,7,12,.93);z-index:10;padding:20px;overflow-y:auto}
+#corpus.show{display:block}
+#corpusbox{max-width:760px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+#corpusbox h2{margin:0 0 2px;font-size:13px;letter-spacing:.16em;color:var(--gold);display:inline-block}
+#corpusbox .sub{color:var(--dim);font-size:12px;margin:2px 0 14px}
+#corpusbox .close{float:right;padding:4px 12px}
+#csearch{width:100%;margin-bottom:6px}
+.cgrp{margin-top:16px}
+.cgrp>span.gh{display:block;font-size:10.5px;letter-spacing:.12em;color:var(--gold);text-transform:uppercase;border-bottom:1px solid var(--line);padding-bottom:4px;margin-bottom:4px}
+.cm{border-left:2px solid var(--gold);padding:6px 0 6px 11px;margin:9px 0}
+.cm b{color:var(--ink);font-size:13px}
+.cm p{margin:4px 0 0;color:var(--dim);font-size:12.5px;white-space:pre-wrap;line-height:1.55}
+.cm .tag{display:inline-block;border:1px solid var(--line);border-radius:20px;padding:0 8px;margin:5px 4px 0 0;font-size:10.5px;color:var(--dim)}
 </style>
 </head>
 <body>
 <header>
   <h1>TESTATE&middot;0</h1>
   <button id="feedbtn" onclick="toggleFeed()" title="whispers sent to the planet">&#9790;</button>
+  <button id="corpusbtn" onclick="openCorpus()" title="read the complete corpus">&#128214;</button>
   <span id="mood"><span id="dot"></span><b id="moodname">waking</b></span>
 </header>
 <div id="feed">
@@ -63,7 +106,34 @@ button:disabled{opacity:.4;cursor:wait}
   <button id="b2" onclick="interview()" title="the avatar asks about its own life">Ask&nbsp;me</button>
   <button id="b3" onclick="song()" title="play a tune">&#9834;</button>
   <button id="b4" onclick="observe()" title="the avatar looks through its camera; only its words are kept">&#128065;</button>
+  <button id="b5" onclick="openJournal()" title="paste a journal entry for the reliquary to read">&#128211;</button>
 </footer>
+<div id="corpus" onclick="if(event.target===this)closeCorpus()">
+  <div id="corpusbox">
+    <button class="close" onclick="closeCorpus()">Close</button>
+    <h2>THE COMPLETE CORPUS</h2>
+    <div class="sub" id="corpussub">reading&hellip;</div>
+    <input id="csearch" placeholder="filter memories&hellip;" oninput="renderCorpus()">
+    <div id="corpusbody"></div>
+  </div>
+</div>
+<div id="jrn" onclick="if(event.target===this)closeJournal()">
+  <div id="jrnbox">
+    <h2>PASTE A JOURNAL ENTRY</h2>
+    <p class="hint">Read on the Jetson, never sent to Venice. It does two things:
+      learns <em>how you write</em> — rhythm, punctuation, your actual words — and
+      lifts out <em>memories</em> for the corpus in your own voice.
+      The entry is archived whole; only the memories enter the corpus.</p>
+    <textarea id="jtext" placeholder="paste the entry..."></textarea>
+    <div class="jrow">
+      <span class="grow" id="jstat"></span>
+      <button onclick="closeJournal()">Close</button>
+      <button id="jgo" onclick="sendJournal()">Read it</button>
+    </div>
+    <div id="janalysis"></div>
+    <div class="past" id="jpast"></div>
+  </div>
+</div>
 <script>
 const log=document.getElementById('log'),box=document.getElementById('box');
 let pendingQ=null;
@@ -83,7 +153,92 @@ async function sendAnswer(){const a=document.getElementById('answer').value.trim
  try{const j=await api('/answer',{question:pendingQ,answer:a});pendingQ=null;add('sys','memory #'+j.count+' committed to the corpus — '+j.ack)}catch(e){add('sys','error: '+e.message)}busy(0)}
 async function song(){busy(1);try{const j=await api('/song');add('sys','♪ played "'+j.song+'" ('+j.mood+')')}catch(e){add('sys','error: '+e.message)}busy(0)}
 async function observe(){busy(1);const w=add('sys','the avatar opens its eye... (image is described, then deleted)');
- try{const j=await api('/observe');w.remove();add('av q',j.observation);setMood(j.mood);add('sys','kept as memory #'+j.count+' — words only, no image')}catch(e){w.textContent='error: '+e.message}busy(0)}
+ try{const j=await api('/observe');w.remove();
+  if(j.duplicate==='frame'){add('sys','the room is unchanged — nothing spent, nothing filed');if(j.observation)add('av q',j.observation)}
+  else if(j.duplicate==='text'){add('av q',j.observation);add('sys','the same scene in different words — noted as recurring, not filed again'+(j.seen?' (seen '+j.seen+'×)':''))}
+  else{add('av q',j.observation);setMood(j.mood);add('sys','kept as memory #'+j.count+' — words only, no image')}
+ }catch(e){w.textContent='error: '+e.message}busy(0)}
+function openJournal(){document.getElementById('jrn').classList.add('show');document.getElementById('jtext').focus();loadPast()}
+function closeJournal(){document.getElementById('jrn').classList.remove('show')}
+function esc(s){const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML}
+function section(h,t,cls){return t?'<h3>'+h+'</h3><p'+(cls?' class="'+cls+'"':'')+'>'+esc(t)+'</p>':''}
+const STYLELBL={register:'Register',syntax:'Syntax &amp; rhythm',diction:'Diction',punctuation:'Punctuation'};
+function renderResult(j){
+ let h='<div class="an">';
+ const m=j.memories||[];
+ h+='<h3>Memories lifted for the corpus ('+m.length+')</h3>';
+ if(!m.length){h+='<p class="absent">Nothing in this entry it judged durable enough to keep.</p>'}
+ else{for(const x of m){h+='<div class="mem"><b>'+esc(x.title)+'</b><p>'+esc(x.narrative)+'</p><div class="tags">';
+  for(const t of (x.tags||[]))h+='<span class="tag">'+esc(t)+'</span>';h+='</div></div>'}}
+ h+='<h3>How you write &mdash; learned so far</h3>';
+ if(j.style_change)h+='<p class="chg">'+esc(j.style_change)+'</p>';
+ const s=j.style||{};
+ for(const k in STYLELBL){if(s[k])h+='<div class="sf"><span>'+STYLELBL[k]+'</span>'+esc(s[k])+'</div>'}
+ for(const k of ['tics','catchphrases']){if(s[k]&&s[k].length){
+  h+='<div class="sf"><span>'+(k==='tics'?'Habits':'Phrases')+'</span><div class="tags">';
+  for(const t of s[k])h+='<span class="tag">'+esc(t)+'</span>';h+='</div></div>'}}
+ const c=j.candidates||{},cw=[].concat(c.catchphrases||[],c.tics||[]);
+ if(cw.length){h+='<div class="sf"><span>Heard once &mdash; needs a second sighting to count</span><div class="tags">';
+  for(const t of cw)h+='<span class="tag cand">'+esc(t)+'</span>';h+='</div></div>'}
+ if(j.style_changed&&j.style_changed.length)h+='<p class="chg">updated: '+esc(j.style_changed.join(', '))+'</p>';
+ return h+'</div>'}
+async function sendJournal(){
+ const t=document.getElementById('jtext').value.trim();if(!t)return;
+ const go=document.getElementById('jgo'),stat=document.getElementById('jstat');
+ go.disabled=true;stat.textContent='the reliquary is reading for voice and memories... (8B model, ~40s)';
+ document.getElementById('janalysis').innerHTML='';
+ try{const j=await api('/journal',{text:t});
+  document.getElementById('janalysis').innerHTML=renderResult(j);
+  stat.textContent='archived '+j.archived+' chars · '+(j.memories||[]).length+' memories · corpus now '+j.count;
+  setMood(j.mood);
+  document.getElementById('jtext').value='';
+  add('sys','journal entry read — '+(j.memories||[]).length+' memories kept, corpus now '+j.count);
+  loadPast();
+ }catch(e){stat.textContent='error: '+e.message}
+ go.disabled=false}
+async function loadPast(){const el=document.getElementById('jpast');
+ try{const j=await(await fetch('/journals')).json();
+  if(!j.local){el.innerHTML='<div class="pj">the local model is not configured (cfg.local.url) — journals are never sent to Venice, so this stays off until it is</div>';return}
+  if(!j.journals.length){el.innerHTML='<div class="pj">no entries read yet</div>';return}
+  let h='';for(const p of j.journals){h+='<div class="pj"><time>'+esc((p.ts||'').replace('T',' '))+'</time>'+
+   '<span class="dg">'+esc(p.style_change||p.excerpt)+'</span>'+
+   '<span class="nm">'+(p.n_memories||0)+' mem</span></div>'}
+  el.innerHTML=h}catch(e){el.innerHTML='<div class="pj">feed error: '+esc(e.message)+'</div>'}}
+let CORPUS=null;
+function openCorpus(){document.getElementById('corpus').classList.add('show');loadCorpus()}
+function closeCorpus(){document.getElementById('corpus').classList.remove('show')}
+async function loadCorpus(){const sub=document.getElementById('corpussub');
+ sub.textContent='reading…';document.getElementById('corpusbody').innerHTML='';
+ try{CORPUS=await(await fetch('/corpus')).json();
+  const id=CORPUS.identity||{},mems=CORPUS.memories||[];
+  sub.textContent=(id.preferred_name||id.full_name||'avatar')+' · '+mems.length+' memories · '+(CORPUS.pending||[]).length+' questions waiting';
+  renderCorpus();
+ }catch(e){sub.textContent='error: '+e.message}}
+function renderCorpus(){if(!CORPUS)return;const body=document.getElementById('corpusbody');
+ const id=CORPUS.identity||{},v=CORPUS.voice||{},val=CORPUS.values||{},mems=CORPUS.memories||[];
+ const q=(document.getElementById('csearch').value||'').toLowerCase();
+ const grp=(lbl,arr)=>{if(!arr||!arr.length)return '';let s='<div class="cgrp"><span class="gh">'+lbl+'</span>';for(const x of arr)s+='<div class="cm"><p>'+esc(x)+'</p></div>';return s+'</div>'};
+ let h='';
+ if(!q){
+  h+='<div class="cgrp"><span class="gh">Identity</span><div class="cm"><b>'+esc(id.full_name||'')+'</b>';
+  if(id.occupations&&id.occupations.length)h+='<p>'+esc(id.occupations.join(' · '))+'</p>';
+  h+='</div></div>';
+  if(v.register||(v.catchphrases&&v.catchphrases.length)){h+='<div class="cgrp"><span class="gh">Voice</span>';
+   if(v.register)h+='<div class="cm"><p>'+esc(v.register)+'</p></div>';
+   if(v.catchphrases&&v.catchphrases.length){h+='<div style="margin-left:11px">';for(const p of v.catchphrases)h+='<span class="tag" style="border-color:var(--gold);color:var(--gold)">'+esc(p)+'</span>';h+='</div>'}
+   h+='</div>'}
+  h+=grp('Beliefs',val.beliefs)+grp('Advice',val.advice)+grp('Won&rsquo;t discuss',val.taboos);
+  if((CORPUS.pending||[]).length){h+='<div class="cgrp"><span class="gh">Wondering</span>';for(const p of CORPUS.pending)h+='<div class="cm"><p>'+esc(p.question)+'</p></div>';h+='</div>'}
+ }
+ const filtered=[];for(let i=mems.length-1;i>=0;i--){const m=mems[i];
+  if(q&&!((m.title||'').toLowerCase().includes(q)||(m.narrative||'').toLowerCase().includes(q)||(m.tags||[]).join(' ').toLowerCase().includes(q)))continue;
+  filtered.push(m)}
+ h+='<div class="cgrp"><span class="gh">Memories ('+filtered.length+(q?' of '+mems.length:'')+')</span>';
+ for(const m of filtered){h+='<div class="cm"><b>'+esc(m.title)+'</b>';
+  if(m.narrative)h+='<p>'+esc(m.narrative)+'</p>';
+  for(const t of (m.tags||[]))h+='<span class="tag">'+esc(t)+'</span>';
+  h+='</div>'}
+ body.innerHTML=h+'</div>'}
 let feedTimer=null;
 async function loadFeed(){const list=document.getElementById('feedlist');
  try{const r=await fetch('/whispers');const j=await r.json();list.innerHTML='';
