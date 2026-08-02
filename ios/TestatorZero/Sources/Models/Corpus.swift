@@ -169,6 +169,49 @@ final class CorpusStore: ObservableObject {
 
     var pendingCount: Int { corpus?.pending.count ?? 0 }
 
+    /// Merge a corpus fetched from a Testament node (schema-tolerant:
+    /// the node's corpus carries fields this app doesn't model, and
+    /// `year` may arrive as a string — so we walk raw JSON rather than
+    /// decode). Phone-only memories survive; node memories merge in by
+    /// title. Returns (added, pendingAdded, total).
+    func mergeFromNode(_ raw: [String: Any]) -> (Int, Int, Int) {
+        guard corpus != nil else { return (0, 0, 0) }
+        var added = 0, pendingAdded = 0
+        let have = Set(corpus!.memories.map(\.title))
+        for m in (raw["memories"] as? [[String: Any]]) ?? [] {
+            guard let title = m["title"] as? String,
+                  let narrative = m["narrative"] as? String,
+                  !have.contains(title) else { continue }
+            corpus!.memories.append(Memory(
+                title: title, narrative: narrative,
+                tags: (m["tags"] as? [String]) ?? ["memory"],
+                year: m["year"] as? Int))
+            added += 1
+        }
+        let havePending = Set(corpus!.pending.map(\.question))
+        for p in (raw["pending"] as? [[String: Any]]) ?? [] {
+            guard let q = p["question"] as? String,
+                  !havePending.contains(q) else { continue }
+            corpus!.pending.append(PendingQuestion(
+                question: q, mood: (p["mood"] as? String) ?? "curious"))
+            pendingAdded += 1
+        }
+        // richer voice/values flow one way: node -> phone, if absent here
+        if let v = raw["voice"] as? [String: Any] {
+            if corpus!.voice.register == nil { corpus!.voice.register = v["register"] as? String }
+            if corpus!.voice.catchphrases == nil { corpus!.voice.catchphrases = v["catchphrases"] as? [String] }
+            if corpus!.voice.humor == nil { corpus!.voice.humor = v["humor"] as? String }
+        }
+        if let vals = raw["values"] as? [String: Any] {
+            if corpus!.values.beliefs == nil { corpus!.values.beliefs = vals["beliefs"] as? [String] }
+            if corpus!.values.advice == nil { corpus!.values.advice = vals["advice"] as? [String] }
+            if corpus!.values.taboos == nil { corpus!.values.taboos = vals["taboos"] as? [String] }
+        }
+        save()
+        if added > 0 { Haptics.success() }
+        return (added, pendingAdded, corpus!.memories.count)
+    }
+
     func popPending() -> PendingQuestion? {
         guard corpus != nil, !corpus!.pending.isEmpty else { return nil }
         let q = corpus!.pending.removeFirst()

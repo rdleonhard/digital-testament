@@ -136,17 +136,26 @@ struct ChatView: View {
         bubbles.append(Bubble(text: text, mine: true))
         busy = true
         defer { busy = false }
-        do {
-            let reply = try await VeniceClient.chat(messages: [
-                ["role": "system", "content": store.systemPrompt()],
-                ["role": "user", "content": text],
-            ], key: key)
-            let (clean, mood) = CorpusStore.parseTags(reply)
-            store.mood = mood
-            bubbles.append(Bubble(text: clean, mine: false))
-            if settings.speakReplies { voice.speak(clean) }
-        } catch {
-            bubbles.append(Bubble(text: "(\(error.localizedDescription))", mine: false))
+        // one silent retry — a demo shouldn't die on a flaky hotel network
+        for attempt in 1 ... 2 {
+            do {
+                let reply = try await VeniceClient.chat(messages: [
+                    ["role": "system", "content": store.systemPrompt()],
+                    ["role": "user", "content": text],
+                ], key: key)
+                let (clean, mood) = CorpusStore.parseTags(reply)
+                store.mood = mood
+                bubbles.append(Bubble(text: clean, mine: false))
+                if settings.speakReplies { voice.speak(clean) }
+                return
+            } catch {
+                if attempt == 2 {
+                    bubbles.append(Bubble(
+                        text: "(\(error.localizedDescription))", mine: false))
+                } else {
+                    try? await Task.sleep(nanoseconds: 800_000_000)
+                }
+            }
         }
     }
 }

@@ -12,6 +12,19 @@ struct AvatarHomeView: View {
         (store.corpus?.memories ?? [])
             .reduce(0) { $0 + $1.narrative.split(separator: " ").count }
     }
+    /// The ways this life has been sensed — interviews, journals, what the
+    /// eye saw, what the ear heard, what it concluded on its own.
+    private var kinds: [(String, Int)] {
+        var counts: [String: Int] = [:]
+        for m in store.corpus?.memories ?? [] {
+            for t in m.tags where ["interview", "journal", "observation",
+                                   "reflection", "ambient", "memory"].contains(t) {
+                counts[t, default: 0] += 1
+            }
+        }
+        return counts.sorted { $0.value > $1.value }.prefix(4).map { ($0.key, $0.value) }
+    }
+
     private var name: String {
         store.corpus?.identity.preferred_name
             ?? store.corpus?.identity.full_name ?? "your avatar"
@@ -36,6 +49,19 @@ struct AvatarHomeView: View {
                 stat(store.streak > 0 ? "\(store.streak)" : "—", "day vigil")
             }
             .padding(.top, 8)
+
+            if !kinds.isEmpty {
+                HStack(spacing: 7) {
+                    ForEach(kinds, id: \.0) { kind, n in
+                        Text("\(n) \(kind)")
+                            .font(.caption2)
+                            .padding(.horizontal, 9).padding(.vertical, 4)
+                            .background(Theme.gold.opacity(0.14), in: Capsule())
+                            .foregroundStyle(Theme.gold)
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
 
             if let q = store.corpus?.pending.first?.question {
                 VStack(spacing: 6) {

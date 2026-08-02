@@ -9,6 +9,8 @@ struct SettingsView: View {
     @State private var showPaywall = false
     @State private var twilightRunning = false
     @State private var twilightLog = ""
+    @State private var syncing = false
+    @State private var syncLog = ""
 
     private var status: String {
         if settings.usingOwnKey { return "Using your own Venice key — free, unlimited." }
@@ -86,6 +88,31 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    TextField("http://testate.local", text: $settings.nodeURL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .foregroundStyle(Theme.ink)
+                    Button {
+                        Task { await syncFromNode() }
+                    } label: {
+                        HStack {
+                            Label(syncing ? "syncing…" : "Sync from my node",
+                                  systemImage: "arrow.triangle.2.circlepath")
+                            if syncing { Spacer(); ProgressView().tint(Theme.gold) }
+                        }
+                    }
+                    .disabled(syncing)
+                    .foregroundStyle(Theme.gold)
+                    if !syncLog.isEmpty {
+                        Text(syncLog).font(.caption).foregroundStyle(Theme.dim)
+                    }
+                } header: {
+                    Text("The node")
+                } footer: {
+                    Text("Pull everything your self-hosted avatar has lived — its interviews, journal memories, nightly reflections, what its eye saw and its ear heard — into this phone. One soul, many bodies.")
+                }
+
+                Section {
                     Toggle("Daily ritual", isOn: $settings.dailyRitual)
                         .tint(Theme.gold)
                         .onChange(of: settings.dailyRitual) { _, on in
@@ -131,6 +158,30 @@ struct SettingsView: View {
             .navigationTitle("Settings")
             .sheet(isPresented: $showPaywall) { PaywallView() }
             .onAppear { voice.requestPermissions() }
+        }
+    }
+
+    private func syncFromNode() async {
+        syncing = true
+        defer { syncing = false }
+        syncLog = "reaching the node…"
+        let base = settings.nodeURL.trimmingCharacters(in: .whitespaces)
+        guard let url = URL(string: base + "/corpus") else {
+            syncLog = "bad node URL"; return
+        }
+        do {
+            var req = URLRequest(url: url); req.timeoutInterval = 20
+            let (data, _) = try await URLSession.shared.data(for: req)
+            guard let raw = try JSONSerialization.jsonObject(with: data)
+                    as? [String: Any] else {
+                syncLog = "that didn't look like a corpus"; return
+            }
+            let (added, pend, total) = store.mergeFromNode(raw)
+            syncLog = added == 0 && pend == 0
+                ? "already in sync — \(total) memories"
+                : "merged \(added) memories and \(pend) questions — \(total) total"
+        } catch {
+            syncLog = "node unreachable: \(error.localizedDescription)"
         }
     }
 

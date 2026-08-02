@@ -9,6 +9,18 @@ struct MemoriesView: View {
     @EnvironmentObject var store: CorpusStore
     @State private var expanded: Set<String> = []
     @State private var composing = false
+    @State private var query = ""
+
+    private var shown: [Memory] {
+        let all = (store.corpus?.memories ?? []).reversed().map { $0 }
+        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return all }
+        return all.filter {
+            $0.title.lowercased().contains(q)
+                || $0.narrative.lowercased().contains(q)
+                || $0.tags.joined(separator: " ").lowercased().contains(q)
+        }
+    }
 
     private var exportURL: URL? {
         guard let c = store.corpus else { return nil }
@@ -50,7 +62,7 @@ struct MemoriesView: View {
                     .listRowBackground(Theme.panel)
                 }
                 Section {
-                    ForEach((store.corpus?.memories ?? []).reversed()) { m in
+                    ForEach(shown) { m in
                         MemoryRow(memory: m, expanded: expanded.contains(m.id))
                             .contentShape(Rectangle())
                             .onTapGesture {
@@ -71,11 +83,13 @@ struct MemoriesView: View {
                             .listRowBackground(Theme.panel)
                     }
                     .onDelete { idxs in
-                        let shown = (store.corpus?.memories ?? []).reversed().map { $0 }
-                        for i in idxs { store.deleteMemory(shown[i]) }
+                        let list = shown
+                        for i in idxs { store.deleteMemory(list[i]) }
                     }
                 } header: {
-                    Text("\(store.corpus?.pending.count ?? 0) questions waiting · long-press to share")
+                    Text(query.isEmpty
+                         ? "\(store.corpus?.pending.count ?? 0) questions waiting · long-press to share"
+                         : "\(shown.count) of \(store.corpus?.memories.count ?? 0) memories")
                         .foregroundStyle(Theme.dim)
                 } footer: {
                     Text("Tap a memory to read it in full, swipe to delete. Your corpus is yours — export it any time; it's the same Digital Corpus the Testament Network deploys to self-hosted nodes, agent runtimes, and, one day, the device your will hands to your executor.")
@@ -84,6 +98,7 @@ struct MemoriesView: View {
             }
             .scrollContentBackground(.hidden)
             .background(Theme.bg)
+            .searchable(text: $query, prompt: "search a life")
             .navigationTitle("Corpus")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

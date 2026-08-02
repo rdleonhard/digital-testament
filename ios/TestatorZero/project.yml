@@ -13,17 +13,27 @@ targets:
       - path: Secrets.plist
         optional: true
         buildPhase: resources
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: Testator Zero
+        UIUserInterfaceStyle: Dark
+        UILaunchScreen: {}
+        NSMicrophoneUsageDescription: "Your avatar listens so your memories can be spoken, not typed."
+        NSSpeechRecognitionUsageDescription: "Speech is transcribed into memories for your corpus."
+        NSCameraUsageDescription: "The avatar looks through your camera to describe a moment; only its words are kept, never the image."
+        NSPhotoLibraryUsageDescription: "Show your avatar a photo; it keeps only its impression, never the image."
+        NSLocalNetworkUsageDescription: "Sync your corpus from the Testament node on your own network."
+        # the node is a device on the user's own LAN, served over plain HTTP
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSBonjourServices:
+          - _http._tcp
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.openesquire.testatorzero
-        MARKETING_VERSION: "0.2.0"
-        CURRENT_PROJECT_VERSION: "1"
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_NSMicrophoneUsageDescription: "Your avatar listens so your memories can be spoken, not typed."
-        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: "Speech is transcribed on-device into memories for your corpus."
-        INFOPLIST_KEY_NSCameraUsageDescription: "The avatar looks through your camera to describe a moment; only its words are kept, never the image."
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_UIUserInterfaceStyle: Dark
+        MARKETING_VERSION: "0.4.0"
+        CURRENT_PROJECT_VERSION: "2"
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
