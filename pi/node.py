@@ -1100,6 +1100,29 @@ def recent_journals(limit=12):
     return list(reversed(out))
 
 
+def do_ambient(impression, title=None, mood="curious"):
+    """An impression from the ear (Jetson, acoustic-only — see
+    jetson/ear.py). No audio, no transcript, no words were ever resolved;
+    what arrives is one sentence about how a stretch of life sounded."""
+    global prompt
+    text = (impression or "").strip()[:600]
+    if not text:
+        raise ValueError("empty impression")
+    corpus.setdefault("memories", []).append({
+        "title": (title or ("What the house sounded like, "
+                            + time.strftime("%Y-%m-%d %H:%M")))[:120],
+        "narrative": text,
+        "tags": ["ambient"],
+    })
+    if mood in avatar.MOODS:
+        state["mood"] = mood
+    avatar.save(corpus)
+    backup_corpus()
+    prompt = avatar.build_prompt(corpus)
+    buz.mood(state["mood"])
+    return {"count": len(corpus["memories"]), "kept": text}
+
+
 def do_answer(question, answer):
     global prompt
     n = avatar.add_memory(corpus, question[:300], answer[:2000])
@@ -1191,6 +1214,10 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/journal":
                 self._json(do_journal(data.get("text", ""),
                                       data.get("note", "")))
+            elif self.path == "/ambient":
+                self._json(do_ambient(data.get("impression", ""),
+                                      data.get("title"),
+                                      data.get("mood", "curious")))
             elif self.path == "/answer":
                 self._json(do_answer(data["question"], data["answer"]))
             elif self.path == "/song":

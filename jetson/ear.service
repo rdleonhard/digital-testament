@@ -1,0 +1,18 @@
+[Unit]
+Description=The ear — ambient acoustic memory (acoustic-only, no speech recognition)
+After=network-online.target ollama.service
+Wants=network-online.target
+
+[Service]
+User=rob
+SupplementaryGroups=audio
+Environment=EAR_HOME=/var/lib/ear
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/ear/ear.py
+Restart=always
+RestartSec=10
+# audio never reaches disk: no state dir, no dumps
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

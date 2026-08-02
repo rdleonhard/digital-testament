@@ -1,0 +1,54 @@
+#!/bin/bash
+# ear — control the ambient sense.
+#   ear off [hours]   privileged mode: stop listening (optionally for N hours)
+#   ear on            resume listening
+#   ear status        is it listening? what did it last keep?
+#   ear last [n]      recent impressions
+#   ear test          stop, take one real capture through the whole chain, resume
+HOME_DIR=/var/lib/ear
+MUTE=$HOME_DIR/muted
+case "${1:-status}" in
+  off)
+    touch "$MUTE"
+    if [ -n "$2" ]; then
+      ( sleep $(( ${2%.*} * 3600 )); rm -f "$MUTE" ) >/dev/null 2>&1 &
+      echo "ear closed for $2h (privileged mode)"
+    else
+      echo "ear closed — 'ear on' to resume"
+    fi ;;
+  on)
+    rm -f "$MUTE"; echo "ear open" ;;
+  status)
+    systemctl is-active --quiet ear && s="running" || s="stopped"
+    [ -f "$MUTE" ] && m="MUTED (privileged mode)" || m="listening"
+    echo "service: $s · $m"
+    echo "today: $(grep -c "$(date +%F)" "$HOME_DIR/impressions.jsonl" 2>/dev/null || echo 0) impressions"
+    tail -1 "$HOME_DIR/impressions.jsonl" 2>/dev/null | python3 -c "
+import json,sys
+try: d=json.load(sys.stdin); print('last:', d['ts'], '—', d['impression'])
+except Exception: print('last: (nothing yet)')" ;;
+  last)
+    tail -"${2:-5}" "$HOME_DIR/impressions.jsonl" 2>/dev/null | python3 -c "
+import json,sys
+for ln in sys.stdin:
+    d=json.loads(ln); print(f\"{d['ts']}  {d['impression']}\")" ;;
+  test)
+    was=$(systemctl is-active ear)
+    sudo systemctl stop ear 2>/dev/null
+    python3 - <<'PY'
+import sys, subprocess, numpy as np
+sys.path.insert(0, "/opt/ear"); import ear
+c = ear.cfg()
+print("listening for 20s (one real capture, full chain)...")
+p = subprocess.run(["arecord","-D",c["device"],"-f","S16_LE","-r","16000",
+                    "-c","1","-d","20","-t","raw","-q","-"], capture_output=True)
+pcm = np.frombuffer(p.stdout, dtype=np.int16)
+f = ear.features(pcm, 16000); del pcm
+print("reading:", ear.shape(f))
+imp = ear.characterize(c, f)
+print("impression:", imp)
+print("committed:", ear.commit(c, imp, f))
+PY
+    [ "$was" = "active" ] && sudo systemctl start ear && echo "(ear resumed)" ;;
+  *) echo "usage: ear {off [hours]|on|status|last [n]|test}" ;;
+esac
