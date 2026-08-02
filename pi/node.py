@@ -1123,6 +1123,42 @@ def do_ambient(impression, title=None, mood="curious"):
     return {"count": len(corpus["memories"]), "kept": text}
 
 
+def do_sync(memories, pending):
+    """Accept memories the phone gathered while away from the node —
+    the reverse of GET /corpus. Merge by title so nothing duplicates;
+    the phone applies the same rule, making sync bidirectional and
+    idempotent. One soul, many bodies, no body authoritative."""
+    global prompt
+    added = pend_added = 0
+    have = {m.get("title") for m in corpus.get("memories", [])}
+    for m in (memories or [])[:200]:
+        title = str(m.get("title", ""))[:120].strip()
+        narrative = str(m.get("narrative", ""))[:4000].strip()
+        if not title or not narrative or title in have:
+            continue
+        tags = [str(t)[:24] for t in (m.get("tags") or ["memory"])[:5]]
+        corpus.setdefault("memories", []).append(
+            {"title": title, "narrative": narrative, "tags": tags})
+        have.add(title)
+        added += 1
+    have_q = {p.get("question") for p in corpus.get("pending", [])}
+    for p in (pending or [])[:40]:
+        q = str(p.get("question", ""))[:300].strip()
+        if not q or q in have_q:
+            continue
+        corpus.setdefault("pending", []).append(
+            {"question": q, "mood": str(p.get("mood", "curious"))[:12]})
+        have_q.add(q)
+        pend_added += 1
+    if added or pend_added:
+        avatar.save(corpus)
+        backup_corpus()
+        prompt = avatar.build_prompt(corpus)
+        buz.mood("cheerful")
+    return {"added": added, "pending_added": pend_added,
+            "total": len(corpus.get("memories", []))}
+
+
 def do_answer(question, answer):
     global prompt
     n = avatar.add_memory(corpus, question[:300], answer[:2000])
@@ -1214,6 +1250,8 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/journal":
                 self._json(do_journal(data.get("text", ""),
                                       data.get("note", "")))
+            elif self.path == "/sync":
+                self._json(do_sync(data.get("memories"), data.get("pending")))
             elif self.path == "/ambient":
                 self._json(do_ambient(data.get("impression", ""),
                                       data.get("title"),

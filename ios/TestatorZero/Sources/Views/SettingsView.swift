@@ -109,7 +109,7 @@ struct SettingsView: View {
                 } header: {
                     Text("The node")
                 } footer: {
-                    Text("Pull everything your self-hosted avatar has lived — its interviews, journal memories, nightly reflections, what its eye saw and its ear heard — into this phone. One soul, many bodies.")
+                    Text("Two-way: pulls everything your self-hosted avatar has lived into this phone, and pushes what you've told the phone back to the node — so a memory dictated anywhere reaches the twilight reflections at home. One soul, many bodies, no body authoritative.")
                 }
 
                 Section {
@@ -170,16 +170,38 @@ struct SettingsView: View {
             syncLog = "bad node URL"; return
         }
         do {
+            // pull: everything the node has lived
             var req = URLRequest(url: url); req.timeoutInterval = 20
             let (data, _) = try await URLSession.shared.data(for: req)
             guard let raw = try JSONSerialization.jsonObject(with: data)
                     as? [String: Any] else {
                 syncLog = "that didn't look like a corpus"; return
             }
-            let (added, pend, total) = store.mergeFromNode(raw)
-            syncLog = added == 0 && pend == 0
-                ? "already in sync — \(total) memories"
-                : "merged \(added) memories and \(pend) questions — \(total) total"
+            let nodeTitles = Set(((raw["memories"] as? [[String: Any]]) ?? [])
+                .compactMap { $0["title"] as? String })
+            let (added, pend, _) = store.mergeFromNode(raw)
+
+            // push: everything only this phone has lived
+            var pushed = 0
+            let mine = (store.corpus?.memories ?? [])
+                .filter { !nodeTitles.contains($0.title) }
+            if !mine.isEmpty, let syncURL = URL(string: base + "/sync") {
+                let payload: [String: Any] = ["memories": mine.map {
+                    ["title": $0.title, "narrative": $0.narrative, "tags": $0.tags]
+                }]
+                var push = URLRequest(url: syncURL)
+                push.httpMethod = "POST"
+                push.timeoutInterval = 20
+                push.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                push.httpBody = try JSONSerialization.data(withJSONObject: payload)
+                let (pdata, _) = try await URLSession.shared.data(for: push)
+                pushed = ((try? JSONSerialization.jsonObject(with: pdata))
+                    as? [String: Any])?["added"] as? Int ?? 0
+            }
+            let total = store.corpus?.memories.count ?? 0
+            syncLog = added == 0 && pushed == 0 && pend == 0
+                ? "already in sync — \(total) memories everywhere"
+                : "pulled \(added) · pushed \(pushed) · \(pend) questions — \(total) memories, both bodies"
         } catch {
             syncLog = "node unreachable: \(error.localizedDescription)"
         }

@@ -61,7 +61,7 @@ final class CorpusStore: ObservableObject {
     @Published var justWoke = false
 
     static let moods = ["curious", "cheerful", "pensive", "wistful", "alert"]
-    private let grownTags: Set<String> = ["interview", "observation", "reflection"]
+    private let grownTags: Set<String> = ["interview", "observation", "reflection", "journal", "ambient", "memory"]
 
     private var url: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
