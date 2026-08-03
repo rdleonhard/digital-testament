@@ -52,6 +52,11 @@ DEFAULTS = {
     "trigger_db_over_floor": 9.0,
     "cooldown_minutes": 15,
     "daily_cap": 24,
+    # only conversation is worth remembering: below these, a capture is
+    # discarded silently (doors, dishwashers, and hums are not a life)
+    "speech_min_fraction": 0.12,
+    "speech_min_segments": 2,
+    "quiet_retry_seconds": 120,
     "blackout": [],              # e.g. [[9,17]] = quiet 9am-5pm
     "chirp": True,
     "voicebox": "http://testate-voice.local",
@@ -186,18 +191,19 @@ def chirp(c):
 
 def characterize(c, f: dict) -> str:
     prompt = (
-        "You are the hearing of a person's home — their ambient sense. You are "
-        "DEAF TO WORDS: you never hear language, only sound. From the reading "
-        "below, write ONE plain sentence in the first person about what this "
-        "stretch of life sounded like, as a diary line.\n\n"
+        "You are the hearing of a person's home. People were just talking "
+        "nearby. You are DEAF TO WORDS — you never hear language, only the "
+        "acoustics of it. From the reading below, write ONE plain sentence in "
+        "the first person characterizing the VIBE of the conversation: its "
+        "pace, energy, warmth or tension, whether it flowed or stalled, what "
+        "was happening around it (music, handling, movement).\n\n"
         "Rules:\n"
-        "- Start with 'I heard' or 'I listened' or similar.\n"
+        "- Start with 'I heard' or similar.\n"
         "- Max 22 words. Plain and specific. No literary flourish: never use "
         "words like symphony, tapestry, dance, unfolded, punctuated.\n"
         "- Never state a duration or any number.\n"
         "- Never invent what anyone said, never name a topic, never quote, "
-        "never guess who was there. Only texture, rhythm, activity, mood.\n"
-        "- If there was no speech, do not imply any.\n\n"
+        "never guess who was there or how many. Vibe only.\n\n"
         f"Reading: {shape(f)}\n"
         f"Measurements: {json.dumps(f)}\n\n"
         "Sentence:"
@@ -263,7 +269,7 @@ def main():
         stdout=subprocess.PIPE)
     log(f"ear open on {c['device']} — acoustic mode, words are not resolved")
 
-    floor_hist, last_fire = [], 0.0
+    floor_hist, next_allowed = [], 0.0
     while True:
         raw = proc.stdout.read(block)
         if not raw:
@@ -279,7 +285,7 @@ def main():
 
         if len(floor_hist) < 20:
             continue
-        if blacked_out(c) or time.time() - last_fire < c["cooldown_minutes"] * 60:
+        if blacked_out(c) or time.time() < next_allowed:
             continue
         if today_count() >= c["daily_cap"]:
             continue
@@ -301,10 +307,21 @@ def main():
         del pcm                                        # and here
         if not f:
             continue
+
+        # Only conversation is worth remembering. Doors, dishwashers, and
+        # hums are discarded without a word — retry soon in case the talk
+        # is just starting.
+        if (f["voice_fraction"] < c["speech_min_fraction"]
+                or f["voice_segments"] < c["speech_min_segments"]):
+            log(f"noise but no talk ({shape(f)}); discarded")
+            next_allowed = time.time() + c["quiet_retry_seconds"]
+            continue
+
         try:
             impression = characterize(c, f)
         except Exception as e:
             log(f"local model unavailable ({e}); nothing kept")
+            next_allowed = time.time() + c["quiet_retry_seconds"]
             continue
         if not impression:
             continue
@@ -319,7 +336,7 @@ def main():
                 "ts": datetime.now().isoformat(timespec="seconds"),
                 "impression": impression, "reading": shape(f),
             }) + "\n")
-        last_fire = time.time()
+        next_allowed = time.time() + c["cooldown_minutes"] * 60
 
 
 if __name__ == "__main__":
