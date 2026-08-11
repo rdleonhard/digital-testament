@@ -1123,6 +1123,112 @@ def do_ambient(impression, title=None, mood="curious"):
     return {"count": len(corpus["memories"]), "kept": text}
 
 
+# --- the room diary --------------------------------------------------------
+# What the office senses, documented: movement events from the eye,
+# conversations transcribed by the ear (written notice posted in the room;
+# its regular speakers have consented), and acoustic classifications of
+# everything else. The diary is a SEPARATE store from the corpus — raw
+# events and transcripts never sync to the phone and never reach the
+# commons. Once a day, a digest (statistics + a line about the day) is
+# distilled into a single corpus memory tagged 'diary'.
+
+DIARY = BASE / "diary.jsonl"
+
+
+def do_diary_event(data):
+    kind = str(data.get("kind", "event"))[:24]
+    ev = {
+        "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "kind": kind,                                  # movement | conversation | acoustic
+        "label": str(data.get("label", ""))[:80],      # arrived/left | vibe class
+    }
+    if data.get("detail"):
+        ev["detail"] = str(data["detail"])[:400]       # vibe sentence, event note
+    if data.get("transcript"):
+        ev["transcript"] = str(data["transcript"])[:8000]
+    if data.get("seconds") is not None:
+        ev["seconds"] = int(data["seconds"])
+    with DIARY.open("a") as f:
+        f.write(json.dumps(ev) + "\n")
+    return {"logged": kind, "label": ev["label"]}
+
+
+def diary_events(day=None):
+    if not DIARY.exists():
+        return []
+    day = day or time.strftime("%Y-%m-%d")
+    out = []
+    for ln in DIARY.read_text().splitlines():
+        try:
+            ev = json.loads(ln)
+        except ValueError:
+            continue
+        if ev.get("ts", "").startswith(day):
+            out.append(ev)
+    return out
+
+
+def do_diary_digest(day=None):
+    """Distill one day of the room's senses into a single corpus memory:
+    percentages of how the hours felt, movement rhythm, and what was
+    actually discussed (from transcripts, summarized — the transcripts
+    themselves stay in the diary)."""
+    global prompt
+    day = day or time.strftime("%Y-%m-%d")
+    evs = diary_events(day)
+    if not evs:
+        return {"skipped": "no diary events for " + day}
+
+    # statistics: classify every acoustic/conversation event by label
+    import collections
+    acoustic = [e for e in evs if e["kind"] in ("acoustic", "conversation")]
+    counts = collections.Counter(e["label"] or "unclassified" for e in acoustic)
+    total = sum(counts.values()) or 1
+    stats = ", ".join(f"{round(100 * n / total)}% {lbl}"
+                      for lbl, n in counts.most_common(6))
+    moves = [e for e in evs if e["kind"] == "movement"]
+    arrivals = sum(1 for e in moves if e["label"] == "arrived")
+    present_s = sum(e.get("seconds", 0) for e in moves if e["label"] == "left")
+    convs = [e for e in evs if e.get("transcript")]
+
+    tsummary = ""
+    if convs:
+        joined = "\n---\n".join(e["transcript"][:1200] for e in convs[:6])
+        ask = ("These are transcripts of conversations in a private office "
+               "(its speakers consented in writing). Summarize in 2-3 plain "
+               "first-person sentences what was discussed today, as the "
+               "room's diary. No quotes, no names beyond what appears, no "
+               "speculation.\n\n" + joined)
+        try:
+            tsummary = infer([
+                {"role": "system",
+                 "content": "You write terse, factual diary summaries."},
+                {"role": "user", "content": ask}], max_tokens=180,
+                prefer="local")
+        except Exception as e:
+            tsummary = ""
+            print("diary digest summary failed:", e, flush=True)
+
+    narrative = (
+        f"What my office sensed on {day}: {stats or 'nothing classified'}. "
+        f"{arrivals} arrival{'s' if arrivals != 1 else ''}"
+        + (f", about {present_s // 60} minutes of presence" if present_s else "")
+        + f", {len(convs)} conversation{'s' if len(convs) != 1 else ''} documented."
+        + (f" {tsummary.strip()}" if tsummary else ""))
+
+    corpus.setdefault("memories", []).append({
+        "title": f"The office diary, {day}",
+        "narrative": narrative[:2000],
+        "tags": ["diary"],
+    })
+    avatar.save(corpus)
+    backup_corpus()
+    prompt = avatar.build_prompt(corpus)
+    return {"day": day, "events": len(evs), "stats": stats,
+            "conversations": len(convs),
+            "count": len(corpus["memories"])}
+
+
 def do_sync(memories, pending):
     """Accept memories the phone gathered while away from the node —
     the reverse of GET /corpus. Merge by title so nothing duplicates;
@@ -1207,6 +1313,8 @@ class Handler(BaseHTTPRequestHandler):
             # GET rather than POST purely so the sleeping MCU can ask with a
             # bare one-line request; it does consume a queued stay-awake.
             self._json(do_roving_checkin())
+        elif self.path == "/diary":
+            self._json({"events": diary_events()[-80:]})
         elif self.path == "/whispers":
             self._json({"whispers": urb.recent() if urb else []})
         elif self.path == "/journals":
@@ -1252,6 +1360,10 @@ class Handler(BaseHTTPRequestHandler):
                                       data.get("note", "")))
             elif self.path == "/sync":
                 self._json(do_sync(data.get("memories"), data.get("pending")))
+            elif self.path == "/diary":
+                self._json(do_diary_event(data))
+            elif self.path == "/diary/digest":
+                self._json(do_diary_digest(data.get("day")))
             elif self.path == "/ambient":
                 self._json(do_ambient(data.get("impression", ""),
                                       data.get("title"),
@@ -1302,7 +1414,13 @@ def main():
     def greet():
         state["mood"] = "cheerful"
         buz.mood("cheerful")
-    eye = Eye(cfg.get("presence", {}), on_arrival=greet)
+    def movement(label, seconds):
+        try:
+            do_diary_event({"kind": "movement", "label": label,
+                            "seconds": seconds})
+        except Exception as e:
+            print("diary movement log failed:", e, flush=True)
+    eye = Eye(cfg.get("presence", {}), on_arrival=greet, on_event=movement)
     urb = UrbitBridge(cfg.get("urbit", {}), log_path=BASE / "whispers.jsonl")
     if urb.enabled:
         urb.whisper("the tomb wakes: " + str(

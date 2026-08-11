@@ -22,14 +22,16 @@ LINGER_S = 60           # still "present" this long after last sighting
 
 
 class Eye:
-    def __init__(self, conf, on_arrival=None):
+    def __init__(self, conf, on_arrival=None, on_event=None):
         conf = conf or {}
         self.enabled = False
         self.present = False
         self.last_seen = 0.0
+        self.arrived_at = 0.0
         self.score = conf.get("score", 0.55)
         self.greet_after = conf.get("greet_after_min", 30) * 60
         self.on_arrival = on_arrival
+        self.on_event = on_event   # diary hook: (label, seconds) -> None
         if conf.get("enabled", True) is False:
             print("eye: disabled by config")
             return
@@ -69,12 +71,18 @@ class Eye:
                     if not self.present:
                         gap = now - self.last_seen
                         self.present = True
+                        self.arrived_at = now
+                        if self.on_event:
+                            self.on_event("arrived", 0)
                         if gap >= self.greet_after and self.on_arrival:
                             print(f"eye: arrival after {int(gap / 60)}m away")
                             self.on_arrival()
                     self.last_seen = now
                 elif self.present and now - self.last_seen > LINGER_S:
                     self.present = False
+                    if self.on_event:
+                        self.on_event("left",
+                                      int(self.last_seen - self.arrived_at))
             except Exception as e:
                 print(f"eye: watch error ({e})")
                 time.sleep(5)

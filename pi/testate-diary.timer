@@ -1,0 +1,9 @@
+[Unit]
+Description=Distill the office diary once a day, late
+
+[Timer]
+OnCalendar=*-*-* 23:40:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

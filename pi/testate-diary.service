@@ -1,0 +1,7 @@
+[Unit]
+Description=TESTATE office diary digest (distill the day's senses into one memory)
+After=testate.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/curl -s -m 300 -X POST http://127.0.0.1/diary/digest

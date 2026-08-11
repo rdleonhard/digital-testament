@@ -21,7 +21,8 @@ case "${1:-status}" in
   status)
     systemctl is-active --quiet ear && s="running" || s="stopped"
     [ -f "$MUTE" ] && m="MUTED (privileged mode)" || m="listening"
-    echo "service: $s · $m"
+    mode=$(python3 -c "import json;c=json.load(open('$HOME_DIR/config.json'));print('TRANSCRIBING conversations' if c.get('transcribe') and c.get('consent_notice') else 'acoustic only (word-deaf)')" 2>/dev/null)
+    echo "service: $s · $m · $mode"
     echo "today: $(grep -c "$(date +%F)" "$HOME_DIR/impressions.jsonl" 2>/dev/null || echo 0) impressions"
     tail -1 "$HOME_DIR/impressions.jsonl" 2>/dev/null | python3 -c "
 import json,sys

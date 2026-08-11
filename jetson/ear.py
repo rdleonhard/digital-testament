@@ -57,6 +57,16 @@ DEFAULTS = {
     "speech_min_fraction": 0.12,
     "speech_min_segments": 2,
     "quiet_retry_seconds": 120,
+    # office mode: keep capturing while the talk continues
+    "max_capture_seconds": 180,
+    "tail_quiet_seconds": 15,
+    # transcription is OFF unless BOTH are set: the flag, and an
+    # affirmative statement of the legal basis. The config documents
+    # consent; without it, no ASR runs. (18 Pa.C.S. § 5704(4): all
+    # parties have consented; written notice is posted in the room.)
+    "transcribe": False,
+    "consent_notice": "",
+    "whisper_model": "base.en",
     "blackout": [],              # e.g. [[9,17]] = quiet 9am-5pm
     "chirp": True,
     "voicebox": "http://testate-voice.local",
@@ -174,6 +184,44 @@ def shape(f: dict) -> str:
     return "; ".join(bits)
 
 
+def classify(f: dict) -> str:
+    """Deterministic label for the day's statistics — no model involved."""
+    if not f:
+        return "too brief"
+    v, segs = f["voice_fraction"], f["voice_segments"]
+    if v >= 0.12 and segs >= 2:
+        if f["turn_rate_per_min"] >= 25 and f["loudness_variation"] >= 8:
+            return "lively exchange"
+        if segs <= 3 and f["mean_segment_sec"] >= 6:
+            return "one voice at length"
+        if f["level_db"] < -45:
+            return "quiet murmured talk"
+        return "steady conversation"
+    if f["musical_fraction"] > 0.3:
+        return "music playing"
+    if f["transients"] >= 4:
+        return "movement and handling"
+    return "quiet stir"
+
+
+_wm = None
+
+
+def transcribe(pcm: np.ndarray, sr: int, c) -> str:
+    """Local Whisper on the Orin. Only reachable when the config carries
+    both the transcribe flag AND a written consent basis."""
+    global _wm
+    from faster_whisper import WhisperModel
+    if _wm is None:
+        log(f"loading whisper {c['whisper_model']} (first use)")
+        _wm = WhisperModel(c["whisper_model"], device="cpu",
+                           compute_type="int8")
+    audio = pcm.astype(np.float32) / 32768.0
+    segs, _info = _wm.transcribe(audio, language="en", vad_filter=True,
+                                 beam_size=1)
+    return " ".join(s.text.strip() for s in segs).strip()
+
+
 # ------------------------------------------------------------ side effects
 
 def chirp(c):
@@ -219,14 +267,9 @@ def characterize(c, f: dict) -> str:
     return out.split("\n")[0].strip().strip('"')
 
 
-def commit(c, impression: str, f: dict):
-    stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-    body = json.dumps({
-        "impression": impression,
-        "title": f"What the house sounded like, {stamp}",
-        "mood": "wistful" if f.get("voice_fraction", 0) < 0.08 else "curious",
-    }).encode()
-    req = urllib.request.Request(c["node"] + "/ambient", data=body, method="POST",
+def diary(c, payload: dict):
+    body = json.dumps(payload).encode()
+    req = urllib.request.Request(c["node"] + "/diary", data=body, method="POST",
                                  headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.load(r)
@@ -267,7 +310,12 @@ def main():
         ["arecord", "-D", c["device"], "-f", "S16_LE", "-r", str(sr),
          "-c", "1", "-t", "raw", "-q", "-"],
         stdout=subprocess.PIPE)
-    log(f"ear open on {c['device']} — acoustic mode, words are not resolved")
+    transcribing = bool(c.get("transcribe") and c.get("consent_notice"))
+    if transcribing:
+        log(f"ear open on {c['device']} — TRANSCRIBING conversations")
+        log(f"consent basis: {c['consent_notice']}")
+    else:
+        log(f"ear open on {c['device']} — acoustic mode, words not resolved")
 
     floor_hist, next_allowed = [], 0.0
     while True:
@@ -294,47 +342,72 @@ def main():
 
         log(f"something is happening ({db:.0f} dB over a {floor:.0f} dB room)")
         chirp(c)
+        # capture until the room goes quiet for a tail, up to a max
         buf = [raw]
-        for _ in range(need - 1):
+        tail_blocks = int(c["tail_quiet_seconds"] / c["block_seconds"])
+        max_blocks = int(c["max_capture_seconds"] / c["block_seconds"])
+        quiet_run = 0
+        while len(buf) < max_blocks:
             more = proc.stdout.read(block)
             if not more:
                 break
             buf.append(more)
+            b = np.frombuffer(more, dtype=np.int16)
+            bdb = 20 * math.log10(float(np.sqrt((b.astype(np.float32) / 32768) ** 2).mean()) + 1e-9)
+            quiet_run = quiet_run + 1 if bdb < floor + 4 else 0
+            if len(buf) >= need and quiet_run >= tail_blocks:
+                break
         pcm = np.frombuffer(b"".join(buf), dtype=np.int16)
-        del buf                                        # audio dies here
+        del buf
 
         f = features(pcm, sr)
-        del pcm                                        # and here
-        if not f:
-            continue
+        label = classify(f)
 
-        # Only conversation is worth remembering. Doors, dishwashers, and
-        # hums are discarded without a word — retry soon in case the talk
-        # is just starting.
-        if (f["voice_fraction"] < c["speech_min_fraction"]
-                or f["voice_segments"] < c["speech_min_segments"]):
-            log(f"noise but no talk ({shape(f)}); discarded")
+        # everything gets classified once for the daily statistics
+        try:
+            diary(c, {"kind": "acoustic", "label": label,
+                      "seconds": int(len(pcm) / sr)})
+        except Exception as e:
+            log(f"node unreachable ({e})")
+
+        talking = (f["voice_fraction"] >= c["speech_min_fraction"]
+                   and f["voice_segments"] >= c["speech_min_segments"])
+        if not talking:
+            log(f"logged ({label}); no talk, nothing transcribed")
+            del pcm
             next_allowed = time.time() + c["quiet_retry_seconds"]
             continue
 
-        try:
-            impression = characterize(c, f)
-        except Exception as e:
-            log(f"local model unavailable ({e}); nothing kept")
-            next_allowed = time.time() + c["quiet_retry_seconds"]
-            continue
-        if not impression:
-            continue
+        # conversation. transcribe ONLY where the law is satisfied: the
+        # config must carry both the flag and a written-consent basis.
+        transcript = ""
+        if c.get("transcribe") and c.get("consent_notice"):
+            try:
+                transcript = transcribe(pcm, sr, c)
+            except Exception as e:
+                log(f"transcription unavailable ({e})")
+        del pcm                                        # audio dies here
 
+        # the vibe line always; the transcript only under consent
         try:
-            res = commit(c, impression, f)
-            log(f"kept as memory #{res.get('count','?')}: {impression}")
+            vibe = characterize(c, f)
+        except Exception:
+            vibe = label
+        payload = {"kind": "conversation", "label": label, "detail": vibe,
+                   "seconds": int(f["seconds"])}
+        if transcript:
+            payload["transcript"] = transcript
+        try:
+            diary(c, payload)
+            log(f"conversation logged ({label})"
+                + (f" + transcript {len(transcript)} chars" if transcript else ""))
         except Exception as e:
-            log(f"node unreachable ({e}); impression discarded")
+            log(f"node unreachable ({e}); conversation not logged")
         with open(LOG, "a") as fh:
             fh.write(json.dumps({
                 "ts": datetime.now().isoformat(timespec="seconds"),
-                "impression": impression, "reading": shape(f),
+                "label": label, "vibe": vibe,
+                "transcribed": bool(transcript),
             }) + "\n")
         next_allowed = time.time() + c["cooldown_minutes"] * 60
 
