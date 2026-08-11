@@ -59,6 +59,32 @@ No speaker identification, ever.
 **Keep it out of any room where clients are met.** Rule 1.6 doesn't care
 that the recording was discarded.
 
+## Office mode — the Room Diary
+
+The ear can serve a specific room as a **witness**, feeding a diary that
+is separate from the avatar's corpus. Movement (from the Pi's eye),
+conversation, and acoustic classifications all log to the node's diary
+(`/var/lib/testate/diary.jsonl`); **raw events and transcripts never
+sync to the phone and never reach the commons.** Once a day the digest
+(`testate-diary.timer`) distills them into ONE corpus memory:
+
+> *What my office sensed on 2026-08-11: 40% quiet murmured talk, 20%
+> lively exchange, 20% steady conversation, 20% quiet stir. 1 arrival,
+> ~90 minutes of presence, 1 conversation documented. [2–3 sentence
+> summary of what was discussed, from the transcripts].*
+
+**Transcription** (Whisper on the Orin) is the one place words are
+resolved, and it is gated hard: it runs **only** when the config carries
+both `transcribe: true` **and** a non-empty `consent_notice` stating the
+legal basis. This is a deliberate friction — turning it on is an
+assertion that all speakers have consented and written notice is posted
+(18 Pa.C.S. § 5704(4) for a PA office). Without both, the ear stays
+word-deaf and only the acoustic diary (statistics + vibe) accrues.
+Transcripts live in the diary; the corpus only ever sees the digest.
+
+`ear status` states plainly whether transcription is on. Needs
+`faster-whisper` and its model on first use.
+
 ## Control
 
 ```sh
